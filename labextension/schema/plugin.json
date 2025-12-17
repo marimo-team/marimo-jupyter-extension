@@ -1,0 +1,7 @@
+{
+  "title": "Marimo Integration",
+  "description": "Settings for the Marimo JupyterLab extension",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

@@ -1,0 +1,119 @@
+[build-system]
+requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-jupyter-builder>=0.5"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jupyter-marimo-proxy"
+version = "0.1.0"
+description = "Jupyter extension to proxy Marimo with JupyterLab integration"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    { name = "Jiang Yio" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Jupyter",
+    "Framework :: Jupyter :: JupyterLab",
+    "Framework :: Jupyter :: JupyterLab :: 4",
+    "Framework :: Jupyter :: JupyterLab :: Extensions",
+    "Framework :: Jupyter :: JupyterLab :: Extensions :: Prebuilt",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "jupyter-server-proxy",
+    "traitlets>=5.0",
+    "uv>=0.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+docs = [
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/marimo-team/jupyter-marimo-proxy"
+Documentation = "https://marimo-team.github.io/jupyter-marimo-proxy/"
+Repository = "https://github.com/marimo-team/jupyter-marimo-proxy"
+Issues = "https://github.com/marimo-team/jupyter-marimo-proxy/issues"
+
+[project.entry-points."jupyter_serverproxy_servers"]
+marimo = "jupyter_marimo_proxy:setup_marimoserver"
+
+[project.entry-points."jupyter_server_extension_points"]
+jupyter_marimo_proxy = "jupyter_marimo_proxy.handlers"
+
+[tool.hatch.version]
+path = "jupyter_marimo_proxy/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [".github", "*.gif"]
+artifacts = ["jupyter_marimo_proxy/labextension"]
+
+[tool.hatch.build.targets.wheel]
+artifacts = ["jupyter_marimo_proxy/labextension"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"jupyter_marimo_proxy/labextension" = "share/jupyter/labextensions/@jupyter-marimo-proxy/labextension"
+"install.json" = "share/jupyter/labextensions/@jupyter-marimo-proxy/labextension/install.json"
+"jupyter_marimo_proxy/etc/jupyter_server_config.d" = "etc/jupyter/jupyter_server_config.d"
+
+[tool.hatch.build.hooks.jupyter-builder]
+dependencies = ["hatch-jupyter-builder>=0.5"]
+build-function = "hatch_jupyter_builder.npm_builder"
+ensured-targets = [
+    "jupyter_marimo_proxy/labextension/static/style.js",
+    "jupyter_marimo_proxy/labextension/package.json",
+]
+skip-if-exists = ["jupyter_marimo_proxy/labextension/static/style.js"]
+
+[tool.hatch.build.hooks.jupyter-builder.build-kwargs]
+path = "labextension"
+build_cmd = "build:prod"
+npm = ["npm"]
+
+[tool.hatch.build.hooks.jupyter-builder.editable-build-kwargs]
+path = "labextension"
+build_cmd = "build"
+npm = ["npm"]
+source_dir = "labextension/src"
+build_dir = "jupyter_marimo_proxy/labextension"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+source = ["jupyter_marimo_proxy"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.5.1",
+    "pytest>=8.3.5",
+    "pytest-cov>=5.0.0",
+]

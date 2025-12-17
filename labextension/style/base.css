@@ -1,0 +1,253 @@
+/* Marimo Widget Styles */
+.jp-MarimoWidget {
+  background: var(--jp-layout-color1);
+}
+
+.jp-MarimoWidget iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Marimo Sidebar Styles */
+.jp-MarimoSidebar {
+  background: var(--jp-layout-color1);
+  min-width: 200px;
+  overflow: auto;
+}
+
+.jp-MarimoSidebar-content {
+  padding: 12px;
+}
+
+.jp-MarimoSidebar-header {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--jp-border-color2);
+}
+
+.jp-MarimoSidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--jp-ui-font-color0);
+}
+
+.jp-MarimoSidebar-section {
+  margin-bottom: 16px;
+}
+
+.jp-MarimoSidebar-sectionTitle {
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--jp-ui-font-color2);
+  letter-spacing: 0.5px;
+}
+
+/* Status indicator */
+.jp-MarimoSidebar-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--jp-ui-font-color1);
+}
+
+.jp-MarimoSidebar-statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.jp-MarimoSidebar-statusDot.jp-mod-ready {
+  background: var(--jp-success-color1);
+}
+
+.jp-MarimoSidebar-statusDot.jp-mod-error {
+  background: var(--jp-error-color1);
+}
+
+.jp-MarimoSidebar-statusDot.jp-mod-warning {
+  background: var(--jp-warn-color1);
+}
+
+/* Action buttons */
+.jp-MarimoSidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.jp-MarimoSidebar-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color2);
+  color: var(--jp-ui-font-color0);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--jp-ui-font-family);
+  transition: background 0.15s ease;
+}
+
+.jp-MarimoSidebar-button:hover {
+  background: var(--jp-layout-color3);
+}
+
+.jp-MarimoSidebar-button:active {
+  background: var(--jp-layout-color4);
+}
+
+.jp-MarimoSidebar-buttonIcon {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--jp-ui-font-color1);
+  width: 16px;
+  text-align: center;
+}
+
+/* Help section */
+.jp-MarimoSidebar-help {
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+  line-height: 1.5;
+}
+
+.jp-MarimoSidebar-help p {
+  margin: 0 0 8px 0;
+}
+
+.jp-MarimoSidebar-help p:last-child {
+  margin-bottom: 0;
+}
+
+.jp-MarimoSidebar-help code {
+  background: var(--jp-layout-color2);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-family: var(--jp-code-font-family);
+  font-size: 11px;
+}
+
+/* Running Sessions section */
+.jp-MarimoSidebar-sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.jp-MarimoSidebar-refreshButton {
+  background: none;
+  border: none;
+  color: var(--jp-ui-font-color2);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.jp-MarimoSidebar-refreshButton:hover {
+  background: var(--jp-layout-color2);
+  color: var(--jp-ui-font-color0);
+}
+
+.jp-MarimoSidebar-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.jp-MarimoSidebar-sessionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--jp-layout-color2);
+  border-radius: 4px;
+  border: 1px solid var(--jp-border-color2);
+}
+
+.jp-MarimoSidebar-sessionInfo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.jp-MarimoSidebar-sessionName {
+  font-size: 12px;
+  color: var(--jp-ui-font-color0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.jp-MarimoSidebar-killButton {
+  background: none;
+  border: none;
+  color: var(--jp-ui-font-color2);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 0 4px;
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.jp-MarimoSidebar-killButton:hover {
+  background: var(--jp-error-color2);
+  color: var(--jp-ui-inverse-font-color0);
+}
+
+.jp-MarimoSidebar-emptyMessage {
+  font-size: 12px;
+  color: var(--jp-ui-font-color2);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Server controls */
+.jp-MarimoSidebar-serverControls {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.jp-MarimoSidebar-serverButton {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--jp-border-color1);
+  border-radius: 4px;
+  background: var(--jp-layout-color2);
+  color: var(--jp-ui-font-color1);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--jp-ui-font-family);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.jp-MarimoSidebar-serverButton:hover {
+  background: var(--jp-layout-color3);
+}
+
+.jp-MarimoSidebar-serverButton.jp-mod-restart:hover {
+  border-color: var(--jp-brand-color1);
+  color: var(--jp-brand-color1);
+}
+
+.jp-MarimoSidebar-serverButton.jp-mod-start {
+  width: 100%;
+}
+
+.jp-MarimoSidebar-serverButton.jp-mod-start:hover {
+  border-color: var(--jp-success-color1);
+  color: var(--jp-success-color1);
+}

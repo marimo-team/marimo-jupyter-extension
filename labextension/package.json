@@ -1,0 +1,67 @@
+{
+  "name": "@jupyter-marimo-proxy/labextension",
+  "version": "0.1.0",
+  "description": "JupyterLab extension for Marimo integration",
+  "keywords": [
+    "jupyter",
+    "jupyterlab",
+    "jupyterlab-extension",
+    "marimo"
+  ],
+  "homepage": "https://github.com/marimo-team/jupyter-marimo-proxy",
+  "bugs": {
+    "url": "https://github.com/marimo-team/jupyter-marimo-proxy/issues"
+  },
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Marimo Team"
+  },
+  "files": [
+    "lib/**/*.{d.ts,eot,gif,html,jpg,js,js.map,json,png,svg,woff2,ttf}",
+    "style/**/*.{css,js,eot,gif,html,jpg,json,png,svg,woff2,ttf}"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marimo-team/jupyter-marimo-proxy.git"
+  },
+  "scripts": {
+    "build": "npm run build:lib && npm run build:labextension:dev",
+    "build:prod": "npm run clean && npm run build:lib:prod && npm run build:labextension",
+    "build:labextension": "uv jupyter labextension build .",
+    "build:labextension:dev": "jupyter labextension build --development True .",
+    "build:lib": "tsc --sourceMap",
+    "build:lib:prod": "tsc",
+    "clean": "npm run clean:lib && npm run clean:labextension",
+    "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
+    "clean:labextension": "rimraf ../jupyter_marimo_proxy/labextension",
+    "watch": "run-p watch:src watch:labextension",
+    "watch:src": "tsc -w --sourceMap",
+    "watch:labextension": "jupyter labextension watch ."
+  },
+  "dependencies": {
+    "@jupyterlab/application": "^4.0.0",
+    "@jupyterlab/apputils": "^4.0.0",
+    "@jupyterlab/coreutils": "^6.0.0",
+    "@jupyterlab/docregistry": "^4.0.0",
+    "@jupyterlab/filebrowser": "^4.0.0",
+    "@jupyterlab/launcher": "^4.0.0",
+    "@jupyterlab/services": "^7.0.0",
+    "@jupyterlab/ui-components": "^4.0.0",
+    "@lumino/coreutils": "^2.0.0",
+    "@lumino/widgets": "^2.0.0"
+  },
+  "devDependencies": {
+    "@jupyterlab/builder": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^5.0.0",
+    "typescript": "~5.3.0"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "outputDir": "../jupyter_marimo_proxy/labextension",
+    "schemaDir": "schema"
+  }
+}
