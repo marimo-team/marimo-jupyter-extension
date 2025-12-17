@@ -1,0 +1,18 @@
+[Unit]
+Description=JupyterHub
+After=syslog.target network.target
+
+[Service]
+User=jupyterhub
+WorkingDirectory=/opt/jupyterhub
+
+Environment="GITHUB_CLIENT_ID=your-client-id"
+Environment="GITHUB_CLIENT_SECRET=your-client-secret"
+Environment="OAUTH_CALLBACK_URL=https://your-domain.com/hub/oauth_callback"
+
+ExecStart=/opt/jupyterhub/.venv/bin/jupyterhub -f /opt/jupyterhub/jupyterhub_config.py
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

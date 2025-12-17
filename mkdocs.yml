@@ -1,0 +1,42 @@
+site_name: jupyter-marimo-proxy
+site_description: Jupyter extension to proxy Marimo
+site_url: https://marimo-team.github.io/jupyter-marimo-proxy/
+repo_url: https://github.com/marimo-team/jupyter-marimo-proxy
+repo_name: marimo-team/jupyter-marimo-proxy
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Configuration: configuration.md
+  - JupyterHub Deployment: jupyterhub.md
+  - Troubleshooting: troubleshooting.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables

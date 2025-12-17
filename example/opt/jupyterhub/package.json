@@ -1,0 +1,8 @@
+{
+  "name": "jupyterhub-deployment",
+  "version": "1.0.0",
+  "description": "Node.js dependencies for JupyterHub",
+  "dependencies": {
+    "configurable-http-proxy": "^5.1.0"
+  }
+}
