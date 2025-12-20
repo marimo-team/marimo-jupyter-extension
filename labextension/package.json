@@ -24,7 +24,7 @@
   "scripts": {
     "build": "npm run build:lib && npm run build:labextension:dev",
     "build:prod": "npm run clean && npm run build:lib:prod && npm run build:labextension",
-    "build:labextension": "uv jupyter labextension build .",
+    "build:labextension": "jupyter labextension build .",
     "build:labextension:dev": "jupyter labextension build --development True .",
     "build:lib": "tsc --sourceMap",
     "build:lib:prod": "tsc",
