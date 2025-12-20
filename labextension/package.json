@@ -2,12 +2,7 @@
   "name": "@jupyter-marimo-proxy/labextension",
   "version": "0.1.0",
   "description": "JupyterLab extension for Marimo integration",
-  "keywords": [
-    "jupyter",
-    "jupyterlab",
-    "jupyterlab-extension",
-    "marimo"
-  ],
+  "keywords": ["jupyter", "jupyterlab", "jupyterlab-extension", "marimo"],
   "homepage": "https://github.com/marimo-team/jupyter-marimo-proxy",
   "bugs": {
     "url": "https://github.com/marimo-team/jupyter-marimo-proxy/issues"
