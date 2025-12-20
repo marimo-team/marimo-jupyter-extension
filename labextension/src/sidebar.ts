@@ -153,7 +153,6 @@ export class MarimoSidebar extends Widget {
     }
 
     try {
-      const baseUrl = this._getMarimoBaseUrl();
       // Making a request to the proxy URL triggers jupyter-server-proxy to start the process
       const maxAttempts = 15;
       for (let i = 0; i < maxAttempts; i++) {
@@ -211,7 +210,6 @@ export class MarimoSidebar extends Widget {
   }
 
   private async _waitForServer(): Promise<void> {
-    const baseUrl = this._getMarimoBaseUrl();
     const maxAttempts = 20;
 
     for (let i = 0; i < maxAttempts; i++) {

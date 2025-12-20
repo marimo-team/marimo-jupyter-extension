@@ -4,7 +4,7 @@ import {
   ILayoutRestorer
 } from '@jupyterlab/application';
 import { InputDialog, showErrorMessage } from '@jupyterlab/apputils';
-import { ServerConnection } from '@jupyterlab/services';
+import { ServerConnection, KernelSpecAPI } from '@jupyterlab/services';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { PageConfig } from '@jupyterlab/coreutils';
@@ -178,10 +178,73 @@ const plugin: JupyterFrontEndPlugin<void> = {
     commands.addCommand(CommandIDs.newNotebook, {
       label: 'New marimo Notebook',
       caption: 'Create a new marimo notebook',
-      execute: () => {
-        const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
-        shell.add(widget, 'main');
-        shell.activateById(widget.id);
+      execute: async () => {
+        try {
+          // Fetch available kernel specs
+          const specs = await KernelSpecAPI.getSpecs();
+
+          // Extract kernel names and display names
+          const kernelEntries: Array<{ name: string; displayName: string; argv: string[] }> = [];
+          if (specs && specs.kernelspecs) {
+            for (const [name, spec] of Object.entries(specs.kernelspecs)) {
+              if (!spec || !spec.spec) continue;
+              const kernelSpec = spec.spec as Record<string, unknown>;
+              const argv = (kernelSpec.argv as string[]) || [];
+              if (argv.length > 0) {
+                kernelEntries.push({
+                  name,
+                  displayName: (kernelSpec.display_name as string) || name,
+                  argv
+                });
+              }
+            }
+          }
+
+          // If no kernels found, fall back to default behavior (no venv)
+          if (kernelEntries.length === 0) {
+            const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+            shell.add(widget, 'main');
+            shell.activateById(widget.id);
+            return;
+          }
+
+          // Show dropdown dialog to select kernel, with "Default" as first option
+          const items = ['Default (no venv)', ...kernelEntries.map(k => k.displayName)];
+          const result = await InputDialog.getItem({
+            title: 'Select Python Environment',
+            label: 'Kernel:',
+            items,
+            current: 0
+          });
+
+          // If user cancelled or no selection, return early
+          if (!result.button.accept || result.value === null) {
+            return;
+          }
+
+          // Determine venv parameter based on selection
+          let venv: string | undefined;
+          if (result.value !== 'Default (no venv)') {
+            const selectedKernel = kernelEntries.find(k => k.displayName === result.value);
+            if (selectedKernel) {
+              venv = selectedKernel.argv[0];
+            }
+          }
+
+          // Create widget with selected environment
+          const widget = createMarimoWidget(marimoBaseUrl, {
+            label: 'New Notebook',
+            venv
+          });
+          shell.add(widget, 'main');
+          shell.activateById(widget.id);
+        } catch (error) {
+          // Fall back to default behavior on any error (non-blocking)
+          console.warn('Failed to fetch kernels, using default behavior:', error);
+          const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+          shell.add(widget, 'main');
+          shell.activateById(widget.id);
+        }
       }
     });
 

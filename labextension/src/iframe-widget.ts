@@ -13,9 +13,9 @@ const widgetsByInitId = new Map<string, MainAreaWidget<IFrame>>();
  */
 export function createMarimoWidget(
   url: string,
-  options: { filePath?: string; label?: string } = {}
+  options: { filePath?: string; label?: string; venv?: string } = {}
 ): MainAreaWidget<IFrame> {
-  const { filePath, label } = options;
+  const { filePath, label, venv } = options;
 
   const content = new IFrame({
     sandbox: [
@@ -30,7 +30,13 @@ export function createMarimoWidget(
 
   // Generate initializationId for new notebooks (include __new__ prefix to match marimo API)
   const initId = filePath ? null : `__new__${UUID.uuid4()}`;
-  content.url = filePath ? url : url + `?file=${initId}`;
+
+  // Build the URL with file parameter and optional venv parameter
+  let finalUrl = filePath ? url : url + `?file=${initId}`;
+  if (venv) {
+    finalUrl += `&venv=${encodeURIComponent(venv)}`;
+  }
+  content.url = finalUrl;
   content.addClass('jp-MarimoWidget');
 
   const widget = new MainAreaWidget({ content });
