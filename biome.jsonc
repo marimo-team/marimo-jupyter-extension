@@ -1,8 +1,6 @@
 {
   "$schema": "./labextension/node_modules/@biomejs/biome/configuration_schema.json",
-  "files": {
-    "ignore": ["labextension/lib/**", "labextension/node_modules/**", "lib/**", "node_modules/**"]
-  },
+  "files": {},
   "formatter": {
     "indentStyle": "space",
     "enabled": true,

@@ -18,7 +18,7 @@ Launch JupyterLab and click the marimo icon in the launcher.
 
 ## Features
 
-- **JupyterLab Integration**: Marimo appears in the launcher with its own icon
+- **JupyterLab Integration**: marimo appears in the launcher with its own icon
 - **JupyterHub Support**: Works with existing authenticators and spawners
 - **Secure**: Token-based authentication between proxy and marimo
 - **Flexible PATH**: Configure executable search paths via environment variables or config files

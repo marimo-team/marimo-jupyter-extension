@@ -1,7 +1,6 @@
 """Sanity check that the package entry point is correctly registered."""
 
 
-
 def test_entry_point_importable():
     """The setup function should be importable."""
     from jupyter_marimo_proxy import setup_marimoserver
