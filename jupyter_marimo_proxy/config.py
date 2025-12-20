@@ -35,7 +35,10 @@ class MarimoProxyConfig(Configurable):
 
     uvx_path = Unicode(
         allow_none=True,
-        help="Path to uvx executable. If set, uses 'uvx marimo' instead of marimo directly.",
+        help=(
+            "Path to uvx executable. If set, uses 'uvx marimo' instead "
+            "of marimo directly."
+        ),
     ).tag(config=True)
 
     timeout = Int(

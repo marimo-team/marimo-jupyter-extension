@@ -1,14 +1,12 @@
 """Jupyter server extension handlers for marimo tools."""
 
 import json
-import subprocess
 
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
 
-from .config import get_config
-from .executable import get_marimo_command
+from .convert import convert_notebook_to_marimo
 
 
 def _find_marimo_proxy_state(web_app):
@@ -19,9 +17,9 @@ def _find_marimo_proxy_state(web_app):
     """
     for host_pattern, handlers in web_app.handlers:
         for spec in handlers:
-            if hasattr(spec, 'kwargs') and 'state' in spec.kwargs:
-                if 'marimo' in str(spec.regex.pattern):
-                    return spec.kwargs['state']
+            if hasattr(spec, "kwargs") and "state" in spec.kwargs:
+                if "marimo" in str(spec.regex.pattern):
+                    return spec.kwargs["state"]
     return None
 
 
@@ -41,23 +39,17 @@ class ConvertHandler(JupyterHandler):
 
         if not input_path or not output_path:
             self.set_status(400)
-            self.finish({"success": False, "error": "Missing input or output path"})
+            self.finish(
+                {"success": False, "error": "Missing input or output path"}
+            )
             return
 
-        config = get_config()
-        marimo_cmd = get_marimo_command(config)
-
-        result = subprocess.run(
-            [*marimo_cmd, "convert", input_path, "-o", output_path],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode == 0:
+        try:
+            convert_notebook_to_marimo(input_path, output_path)
             self.finish({"success": True, "output": output_path})
-        else:
+        except RuntimeError as e:
             self.set_status(500)
-            self.finish({"success": False, "error": result.stderr or result.stdout})
+            self.finish({"success": False, "error": str(e)})
 
 
 class RestartHandler(JupyterHandler):
@@ -76,7 +68,9 @@ class RestartHandler(JupyterHandler):
 
         if not proxy_state:
             self.set_status(503)
-            self.finish({"success": False, "error": "Proxy not initialized yet"})
+            self.finish(
+                {"success": False, "error": "Proxy not initialized yet"}
+            )
             return
 
         try:

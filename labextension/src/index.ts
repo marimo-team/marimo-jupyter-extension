@@ -1,7 +1,7 @@
 import {
-  JupyterFrontEnd,
-  JupyterFrontEndPlugin,
-  ILayoutRestorer
+  type JupyterFrontEnd,
+  type JupyterFrontEndPlugin,
+  ILayoutRestorer,
 } from '@jupyterlab/application';
 import { InputDialog, showErrorMessage } from '@jupyterlab/apputils';
 import { ServerConnection } from '@jupyterlab/services';
@@ -19,12 +19,12 @@ import '../style/base.css';
 /**
  * Command IDs used by the extension.
  */
-namespace CommandIDs {
-  export const openFile = 'marimo:open-file';
-  export const convertNotebook = 'marimo:convert-notebook';
-  export const newNotebook = 'marimo:new-notebook';
-  export const openEditor = 'marimo:open-editor';
-}
+const CommandIDs = {
+  openFile: 'marimo:open-file',
+  convertNotebook: 'marimo:convert-notebook',
+  newNotebook: 'marimo:new-notebook',
+  openEditor: 'marimo:open-editor',
+} as const;
 
 /**
  * Get the base URL for the Marimo proxy.
@@ -38,7 +38,7 @@ function getMarimoBaseUrl(): string {
  * Get the selected file path from the file browser.
  */
 function getSelectedFilePath(
-  fileBrowserFactory: IFileBrowserFactory
+  fileBrowserFactory: IFileBrowserFactory,
 ): string | null {
   const browser = fileBrowserFactory.tracker.currentWidget;
   if (!browser) {
@@ -80,7 +80,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     app: JupyterFrontEnd,
     fileBrowserFactory: IFileBrowserFactory,
     launcher: ILauncher | null,
-    restorer: ILayoutRestorer | null
+    restorer: ILayoutRestorer | null,
   ) => {
     const { commands, shell } = app;
     const marimoBaseUrl = getMarimoBaseUrl();
@@ -103,7 +103,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const widget = createMarimoWidget(url, { filePath });
         shell.add(widget, 'main');
         shell.activateById(widget.id);
-      }
+      },
     });
 
     // Command: Convert Jupyter notebook to marimo
@@ -128,7 +128,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const result = await InputDialog.getText({
           title: 'Convert to marimo',
           label: 'Output filename:',
-          text: defaultOutput
+          text: defaultOutput,
         });
 
         if (!result.button.accept || !result.value) {
@@ -143,15 +143,18 @@ const plugin: JupyterFrontEndPlugin<void> = {
             `${settings.baseUrl}marimo-tools/convert`,
             {
               method: 'POST',
-              body: JSON.stringify({ input: filePath, output: outputPath })
+              body: JSON.stringify({ input: filePath, output: outputPath }),
             },
-            settings
+            settings,
           );
 
-          const result = await response.json();
+          const result = (await response.json()) as {
+            success: boolean;
+            error?: string;
+          };
 
           if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Conversion failed');
+            throw new Error(result.error ?? 'Conversion failed');
           }
 
           // Refresh the file browser to show the new file
@@ -168,10 +171,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
         } catch (error) {
           showErrorMessage(
             'Conversion failed',
-            `Failed to convert notebook: ${error}`
+            `Failed to convert notebook: ${error}`,
           );
         }
-      }
+      },
     });
 
     // Command: Create new marimo notebook
@@ -179,10 +182,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
       label: 'New marimo Notebook',
       caption: 'Create a new marimo notebook',
       execute: () => {
-        const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+        const widget = createMarimoWidget(marimoBaseUrl, {
+          label: 'New Notebook',
+        });
         shell.add(widget, 'main');
         shell.activateById(widget.id);
-      }
+      },
     });
 
     // Command: Open marimo editor (in new tab)
@@ -192,20 +197,20 @@ const plugin: JupyterFrontEndPlugin<void> = {
       icon: marimoIcon,
       execute: () => {
         window.open(marimoBaseUrl, '_blank');
-      }
+      },
     });
 
     // Add context menu items programmatically for proper visibility support
     app.contextMenu.addItem({
       command: CommandIDs.openFile,
       selector: '.jp-DirListing-item[data-isdir="false"]',
-      rank: 50
+      rank: 50,
     });
 
     app.contextMenu.addItem({
       command: CommandIDs.convertNotebook,
       selector: '.jp-DirListing-item[data-isdir="false"]',
-      rank: 51
+      rank: 51,
     });
 
     // Add to launcher if available
@@ -214,14 +219,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
         command: CommandIDs.newNotebook,
         category: 'Notebook',
         rank: 3,
-        kernelIconUrl: leafIconUrl
+        kernelIconUrl: leafIconUrl,
       });
 
       launcher.add({
         command: CommandIDs.openEditor,
         category: 'Other',
         rank: 1,
-        kernelIconUrl: marimoIconUrl
+        kernelIconUrl: marimoIconUrl,
       });
     }
 
@@ -238,10 +243,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const widgetFactory = new MarimoWidgetFactory({
       name: FACTORY_NAME,
       fileTypes: ['python'],
-      defaultFor: []  // Not the default editor, just available in "Open With"
+      defaultFor: [], // Not the default editor, just available in "Open With"
     });
     app.docRegistry.addWidgetFactory(widgetFactory);
-  }
+  },
 };
 
 export default plugin;

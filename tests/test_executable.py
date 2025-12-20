@@ -40,7 +40,8 @@ class TestGetMarimoCommand:
         assert result == ["/opt/bin/marimo"]
 
     def test_uvx_takes_precedence_over_marimo_path(self, clean_env):
-        """When both uvx_path and marimo_path are set, uvx_path takes precedence."""
+        """When both uvx_path and marimo_path are set, uvx_path takes
+        precedence."""
         from jupyter_marimo_proxy.config import Config
         from jupyter_marimo_proxy.executable import get_marimo_command
 
@@ -69,7 +70,9 @@ class TestGetMarimoCommand:
 
         assert result == [mock_marimo_in_path]
 
-    def test_marimo_not_found_raises_error(self, clean_env, mock_marimo_not_in_path):
+    def test_marimo_not_found_raises_error(
+        self, clean_env, mock_marimo_not_in_path
+    ):
         """When marimo not found anywhere, should raise FileNotFoundError."""
         from jupyter_marimo_proxy.config import Config
         from jupyter_marimo_proxy.executable import get_marimo_command
@@ -115,7 +118,9 @@ class TestFindMarimo:
 
         assert result == str(marimo_path)
 
-    def test_returns_none_when_not_found(self, clean_env, mock_marimo_not_in_path):
+    def test_returns_none_when_not_found(
+        self, clean_env, mock_marimo_not_in_path
+    ):
         """Should return None when marimo not found anywhere."""
         from jupyter_marimo_proxy.executable import _find_marimo
 

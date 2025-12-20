@@ -1,15 +1,14 @@
 """Tests for the setup_marimoserver() function."""
 
 import os
-from pathlib import Path
-
 
 
 class TestSetupMarimoserver:
     """Test suite for setup_marimoserver() return value structure."""
 
     def test_returns_required_keys(self, clean_env, mock_marimo_in_path):
-        """setup_marimoserver should return all required keys for jupyter-server-proxy."""
+        """setup_marimoserver should return all required keys for
+        jupyter-server-proxy."""
         from jupyter_marimo_proxy import setup_marimoserver
 
         result = setup_marimoserver()
@@ -28,7 +27,9 @@ class TestSetupMarimoserver:
         assert isinstance(result["command"], list)
         assert all(isinstance(arg, str) for arg in result["command"])
 
-    def test_command_includes_edit_subcommand(self, clean_env, mock_marimo_in_path):
+    def test_command_includes_edit_subcommand(
+        self, clean_env, mock_marimo_in_path
+    ):
         """Command should include 'edit' subcommand."""
         from jupyter_marimo_proxy import setup_marimoserver
 
@@ -36,15 +37,20 @@ class TestSetupMarimoserver:
 
         assert "edit" in result["command"]
 
-    def test_command_includes_port_placeholder(self, clean_env, mock_marimo_in_path):
-        """Command should include {port} placeholder for jupyter-server-proxy."""
+    def test_command_includes_port_placeholder(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """Command should include {port} placeholder for
+        jupyter-server-proxy."""
         from jupyter_marimo_proxy import setup_marimoserver
 
         result = setup_marimoserver()
 
         assert "{port}" in result["command"]
 
-    def test_command_includes_headless_flag(self, clean_env, mock_marimo_in_path):
+    def test_command_includes_headless_flag(
+        self, clean_env, mock_marimo_in_path
+    ):
         """Command should include --headless flag."""
         from jupyter_marimo_proxy import setup_marimoserver
 
@@ -62,7 +68,8 @@ class TestSetupMarimoserver:
         assert result["timeout"] > 0
 
     def test_launcher_entry_disabled(self, clean_env, mock_marimo_in_path):
-        """Launcher entry should be disabled (labextension provides the launcher)."""
+        """Launcher entry should be disabled (labextension provides the
+        launcher)."""
         from jupyter_marimo_proxy import setup_marimoserver
 
         result = setup_marimoserver()
