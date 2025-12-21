@@ -182,26 +182,30 @@ const plugin: JupyterFrontEndPlugin<void> = {
         try {
           // Fetch available kernel specs
           const specs = await KernelSpecAPI.getSpecs();
+          console.log('[marimo] Available kernels:', specs);
 
           // Extract kernel names and display names
           const kernelEntries: Array<{ name: string; displayName: string; argv: string[] }> = [];
           if (specs && specs.kernelspecs) {
             for (const [name, spec] of Object.entries(specs.kernelspecs)) {
-              if (!spec || !spec.spec) continue;
-              const kernelSpec = spec.spec as Record<string, unknown>;
-              const argv = (kernelSpec.argv as string[]) || [];
+              console.log(`[marimo] Processing kernel: ${name}`, spec);
+              if (!spec) continue;
+              const argv = (spec.argv as string[]) || [];
               if (argv.length > 0) {
                 kernelEntries.push({
                   name,
-                  displayName: (kernelSpec.display_name as string) || name,
+                  displayName: (spec.display_name as string) || name,
                   argv
                 });
               }
             }
           }
 
+          console.log('[marimo] Found kernels:', kernelEntries);
+
           // If no kernels found, fall back to default behavior (no venv)
           if (kernelEntries.length === 0) {
+            console.log('[marimo] No kernels found, using default behavior');
             const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
             shell.add(widget, 'main');
             shell.activateById(widget.id);

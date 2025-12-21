@@ -56,9 +56,6 @@ marimo = "jupyter_marimo_proxy:setup_marimoserver"
 [project.entry-points."jupyter_server_extension_points"]
 jupyter_marimo_proxy = "jupyter_marimo_proxy.handlers"
 
-[project.entry-points."nbconvert.exporters"]
-marimo = "jupyter_marimo_proxy.exporter:MarimoExporter"
-
 [tool.hatch.version]
 path = "jupyter_marimo_proxy/__init__.py"
 
