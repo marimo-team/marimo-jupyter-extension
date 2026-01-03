@@ -30,6 +30,13 @@ BOLD='\033[1m'
 
 # Configuration
 TEST_ENV_DIR=".test-envs"
+CONDA_ENVS_DIR="$TEST_ENV_DIR/conda-envs"
+CONDA_PKGS_DIR="$TEST_ENV_DIR/conda-pkgs"
+
+# Export conda environment variables for isolation
+export CONDA_ENVS_PATH="$CONDA_ENVS_DIR"
+export CONDA_PKGS_DIRS="$CONDA_PKGS_DIR"
+
 KERNEL_NAMES=()
 CONDA_ENVS=()
 
@@ -178,7 +185,14 @@ create_venv() {
 
   # Install ipykernel and register kernel using uv with the venv
   uv pip install --python "$dir/bin/python" -q ipykernel
-  "$dir/bin/python" -m ipykernel install --user --name "$name" --display-name "Test venv #$num" 2>/dev/null
+
+  # Register kernel with error handling
+  local kernel_output
+  if ! kernel_output=$("$dir/bin/python" -m ipykernel install --user --name "$name" --display-name "Test venv #$num" 2>&1); then
+    print_error "Failed to register kernel for $name"
+    echo "$kernel_output"
+    return 1
+  fi
 
   KERNEL_NAMES+=("$name")
   print_success "Created venv: $name"
@@ -195,7 +209,14 @@ create_virtualenv() {
 
   # Install ipykernel and register kernel using uv with the venv
   uv pip install --python "$dir/bin/python" -q ipykernel
-  "$dir/bin/python" -m ipykernel install --user --name "$name" --display-name "Test virtualenv #$num" 2>/dev/null
+
+  # Register kernel with error handling
+  local kernel_output
+  if ! kernel_output=$("$dir/bin/python" -m ipykernel install --user --name "$name" --display-name "Test virtualenv #$num" 2>&1); then
+    print_error "Failed to register kernel for $name"
+    echo "$kernel_output"
+    return 1
+  fi
 
   KERNEL_NAMES+=("$name")
   print_success "Created virtualenv: $name"
@@ -208,8 +229,9 @@ create_conda_env() {
 
   echo "Creating conda environment: $name"
 
-  # Run conda operations in a subshell to isolate environment changes
-  (
+  # Capture output from conda operations instead of redirecting to /dev/null
+  local output
+  output=$(
     if command -v conda &> /dev/null; then
       eval "$(conda shell.bash hook)" 2>/dev/null || true
       conda create -y -q -n "$name" python=3.10 || conda create -y -q -n "$name" python
@@ -219,19 +241,46 @@ create_conda_env() {
       mamba create -y -q -n "$name" python=3.10 || mamba create -y -q -n "$name" python
       mamba run -n "$name" python -c "import sys; print(sys.executable)"
     fi
-  ) 2>/dev/null | {
-    read -r conda_python
+  2>&1)
 
-    if [ -n "$conda_python" ]; then
-      uv pip install --python "$conda_python" -q ipykernel
-      "$conda_python" -m ipykernel install --user --name "$name" --display-name "Test conda #$num" 2>/dev/null
-      CONDA_ENVS+=("$name")
-      KERNEL_NAMES+=("$name")
-      print_success "Created conda environment: $name"
+  local conda_python=$(echo "$output" | tail -n 1)
+
+  if [ -n "$conda_python" ] && [ -f "$conda_python" ]; then
+    # Install ipykernel using conda with error handling
+    local install_output
+    if command -v conda &> /dev/null; then
+      if ! install_output=$(conda install -y -q -n "$name" ipykernel 2>&1); then
+        print_error "Failed to install ipykernel for $name"
+        echo "$install_output"
+        return 1
+      fi
+    elif command -v mamba &> /dev/null; then
+      if ! install_output=$(mamba install -y -q -n "$name" ipykernel 2>&1); then
+        print_error "Failed to install ipykernel for $name"
+        echo "$install_output"
+        return 1
+      fi
     else
-      print_warning "Failed to create conda environment: $name"
+      print_error "Neither conda nor mamba found"
+      return 1
     fi
-  }
+
+    # Register kernel with error handling
+    local kernel_output
+    if ! kernel_output=$("$conda_python" -m ipykernel install --user --name "$name" --display-name "Test conda #$num" 2>&1); then
+      print_error "Failed to register kernel for $name"
+      echo "$kernel_output"
+      return 1
+    fi
+
+    CONDA_ENVS+=("$name")
+    KERNEL_NAMES+=("$name")
+    print_success "Created conda environment: $name"
+  else
+    print_error "Failed to create conda environment: $name"
+    echo "$output"
+    return 1
+  fi
 }
 
 # Main execution
@@ -255,6 +304,12 @@ main() {
   # Create test environment directory if needed
   if [[ $NUM_VENV -gt 0 || $NUM_VIRTUALENV -gt 0 ]]; then
     mkdir -p "$TEST_ENV_DIR"
+  fi
+
+  # Create conda directories if needed
+  if [[ $NUM_CONDA -gt 0 ]]; then
+    mkdir -p "$CONDA_ENVS_DIR"
+    mkdir -p "$CONDA_PKGS_DIR"
   fi
 
   # Create venv environments
