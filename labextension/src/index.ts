@@ -71,7 +71,7 @@ function isNotebookFile(path: string): boolean {
  * The main plugin that provides marimo integration.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: '@jupyter-marimo-proxy/labextension:plugin',
+  id: '@marimo-team/jupyter-extension:plugin',
   description: 'JupyterLab extension for marimo notebook integration',
   autoStart: true,
   requires: [IFileBrowserFactory],

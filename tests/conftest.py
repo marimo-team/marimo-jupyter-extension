@@ -1,4 +1,4 @@
-"""pytest fixtures for jupyter-marimo-proxy tests."""
+"""pytest fixtures for marimo-jupyter-extension tests."""
 
 import os
 import tempfile
@@ -12,9 +12,6 @@ import pytest
 def clean_env():
     """Remove proxy-related environment variables for clean test state."""
     env_vars = [
-        "JUPYTERMARIMOPROXY_MARIMO_PATH",
-        "JUPYTERMARIMOPROXY_UVX_PATH",
-        "JUPYTERMARIMOPROXY_TIMEOUT",
         "JUPYTERHUB_SERVICE_PREFIX",
         "UV",  # Used as fallback for uvx_path
     ]
@@ -43,18 +40,6 @@ def temp_bin_dir():
 
 
 @pytest.fixture
-def temp_rc_file():
-    """Create a temporary deprecated rc file."""
-    rc_path = Path("~/.jupytermarimoproxyrc").expanduser()
-    existed = rc_path.exists()
-    if not existed:
-        rc_path.write_text("[DEFAULT]\npath = /tmp\n")
-    yield rc_path
-    if not existed and rc_path.exists():
-        rc_path.unlink()
-
-
-@pytest.fixture
 def mock_marimo_in_path(temp_bin_dir):
     """Mock shutil.which to return a marimo path."""
     marimo_path = str(Path(temp_bin_dir) / "marimo")
@@ -65,9 +50,9 @@ def mock_marimo_in_path(temp_bin_dir):
 @pytest.fixture
 def mock_marimo_not_in_path():
     """Mock shutil.which to return None (marimo not found)."""
-    with patch("jupyter_marimo_proxy.executable.shutil.which", return_value=None):
+    with patch("marimo_jupyter_extension.executable.shutil.which", return_value=None):
         with patch(
-            "jupyter_marimo_proxy.executable.COMMON_LOCATIONS",
+            "marimo_jupyter_extension.executable.COMMON_LOCATIONS",
             ["/nonexistent/path/marimo"],
         ):
             yield

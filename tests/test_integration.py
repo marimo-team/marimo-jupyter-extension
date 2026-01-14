@@ -88,7 +88,7 @@ class TestSetupIntegration:
     @pytest.mark.integration
     def test_setup_marimoserver_full_command(self):
         """Verify setup_marimoserver produces valid command structure."""
-        from jupyter_marimo_proxy import setup_marimoserver
+        from marimo_jupyter_extension import setup_marimoserver
 
         try:
             result = setup_marimoserver()
@@ -107,7 +107,7 @@ class TestSetupIntegration:
     @pytest.mark.integration
     def test_setup_marimoserver_command_executable(self):
         """Verify the executable in command actually exists."""
-        from jupyter_marimo_proxy import setup_marimoserver
+        from marimo_jupyter_extension import setup_marimoserver
 
         try:
             result = setup_marimoserver()

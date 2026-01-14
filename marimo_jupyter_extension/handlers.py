@@ -99,7 +99,7 @@ class RestartHandler(JupyterHandler):
 
 def _jupyter_server_extension_points():
     """Return the server extension points for this package."""
-    return [{"module": "jupyter_marimo_proxy.handlers"}]
+    return [{"module": "marimo_jupyter_extension.handlers"}]
 
 
 def _load_jupyter_server_extension(server_app):
@@ -112,4 +112,4 @@ def _load_jupyter_server_extension(server_app):
             (url_path_join(base_url, "marimo-tools/restart"), RestartHandler),
         ],
     )
-    server_app.log.info("jupyter-marimo-proxy tools extension loaded")
+    server_app.log.info("marimo-jupyter-extension tools extension loaded")

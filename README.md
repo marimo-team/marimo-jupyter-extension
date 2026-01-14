@@ -1,35 +1,35 @@
 # Jupyter + Marimo = ❤️
 
-`jupyter-marimo-proxy` enables the **JupyterLab** launcher and the classic **Jupyter Notebook** file browser to launch **[Marimo](https://marimo.io/)**.
+`marimo-jupyter-extension` enables the **JupyterLab** launcher and the classic **Jupyter Notebook** file browser to launch **[Marimo](https://marimo.io/)**.
 
-On a **JupyterHub** deployment, `jupyter-marimo-proxy` leverages **JupyterHub**'s existing authenticator and spawner to launch **Marimo** within users' **Jupyter** environments.
+On a **JupyterHub** deployment, `marimo-jupyter-extension` leverages **JupyterHub**'s existing authenticator and spawner to launch **Marimo** within users' **Jupyter** environments.
 
 ## Installation
 
-`jupyter-marimo-proxy` requires **Marimo**, but does not explicitly declare a dependency on `marimo`, so they may be installed separately. Both may be installed using `pip` like so:
+`marimo-jupyter-extension` requires **Marimo**, but does not explicitly declare a dependency on `marimo`, so they may be installed separately. Both may be installed using `pip` like so:
 
 ```sh
-$ pip install 'marimo>=0.6.21' jupyter-marimo-proxy
+$ pip install 'marimo>=0.6.21' marimo-jupyter-extension
 ```
 
 ## Minimal demo, single Python environment
 
-The following Dockerfile builds an image that runs **JupyterHub** (on port `8000`) with `DummyAuthenticator` (`demo`:`demo`), `LocalProcessSpawner`, **Marimo**, and `jupyter-marimo-proxy`.
+The following Dockerfile builds an image that runs **JupyterHub** (on port `8000`) with `DummyAuthenticator` (`demo`:`demo`), `LocalProcessSpawner`, **Marimo**, and `marimo-jupyter-extension`.
 
 ```dockerfile
 FROM	quay.io/jupyterhub/jupyterhub:latest
 RUN	cd /srv/jupyterhub && jupyterhub --generate-config && \
 	echo "c.JupyterHub.authenticator_class = 'dummy'" >> jupyterhub_config.py && \
 	echo "c.DummyAuthenticator.password = 'demo'" >> jupyterhub_config.py && \
-	pip install --no-cache-dir notebook 'marimo>=0.6.21' jupyter-marimo-proxy
+	pip install --no-cache-dir notebook 'marimo>=0.6.21' marimo-jupyter-extension
 RUN	useradd -ms /bin/bash demo
 ```
 
 ## Advanced demo, multiple Python environments
 
-With more complicated setups that include multiple Python environments, it is vital to determine *where* each package is to be installed. **Marimo** should be installed into the *user's* environment to access the user's packages but made available in the search path so **Jupyter** could find it, and `jupyter-marimo-proxy` must be installed directly into **Jupyter**'s environment so **Jupyter** could import it.
+With more complicated setups that include multiple Python environments, it is vital to determine *where* each package is to be installed. **Marimo** should be installed into the *user's* environment to access the user's packages but made available in the search path so **Jupyter** could find it, and `marimo-jupyter-extension` must be installed directly into **Jupyter**'s environment so **Jupyter** could import it.
 
-Consider the following example, in which **Jupyter** comes pre-installed in the root environment but **Miniforge** is installed for the user. We take care to install **Marimo** using `/opt/conda/bin/pip` and `jupyter-marimo-proxy` using `/usr/bin/pip`. By the magic of search path manipulation, **Marimo** is also available to **Jupyter**.
+Consider the following example, in which **Jupyter** comes pre-installed in the root environment but **Miniforge** is installed for the user. We take care to install **Marimo** using `/opt/conda/bin/pip` and `marimo-jupyter-extension` using `/usr/bin/pip`. By the magic of search path manipulation, **Marimo** is also available to **Jupyter**.
 
 ```dockerfile
 FROM	quay.io/jupyterhub/jupyterhub:latest
@@ -44,35 +44,37 @@ RUN	curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download
 	bash /root/miniforge.sh -b -p /opt/conda && rm /root/miniforge.sh
 
 RUN	/opt/conda/bin/pip install --no-cache-dir 'marimo>=0.6.21'
-RUN	/usr/bin/pip install --no-cache-dir jupyter-marimo-proxy
+RUN	/usr/bin/pip install --no-cache-dir marimo-jupyter-extension
 
 RUN	useradd -ms /bin/bash demo
 ```
 
-## Executable search path modification
+## Configuration
 
-For search path modifications that should be available to all users, I'd recommend invoking **Jupyter** with the desired search path, e.g., by setting `PATH` in the Dockerfile or an entrypoint wrapper. On some deployments, it may be impractical to set up the search path before/while invoking **Jupyter**, such as when the exact paths must be resolved at runtime. `jupyter-marimo-proxy` provides two ways to modify the search path: by environment variable or by configuration file.
+By default, the extension searches for `marimo` in the system PATH and common locations (`~/.local/bin`, `/opt/bin`, `/usr/local/bin`).
 
-For example, to prepend `~/.local/bin:~/bin` to the search path, one could set environment variable `JUPYTERMARIMOPROXY_PATH` to `~/.local/bin:~/bin:$PATH` or create a configuration file `~/.jupytermarimoproxyrc` containing:
+For JupyterHub deployments, configure the extension in `jupyterhub_config.py`:
 
-```ini
-[DEFAULT]
-path = ~/.local/bin:~/bin:$PATH
+```python
+# Explicit marimo path
+c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
+
+# Or use uvx mode
+c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"
+
+# Startup timeout (default: 60s)
+c.MarimoProxyConfig.timeout = 120
 ```
-
-If using the environment variable, `JUPYTERMARIMOPROXY_PATH` may need to be added to [`c.Spawner.env_keep`](https://jupyterhub.readthedocs.io/en/stable/reference/api/spawner.html#jupyterhub.spawner.Spawner.env_keep) in the **JupyterHub** configuration.
-
-Both methods support home directory and environment variable expansion, and the `JUPYTERMARIMOPROXY_PATH` variable may be subject to double-expansion if not properly escaped or quoted. If the environment variable and the configuration option were both present, the environment variable would take precedence.
 
 ## Usage with DockerSpawner
 
-**Marimo** and `jupyter-marimo-proxy` should be installed into the single-user containers. They are not needed by the main hub.
+**Marimo** and `marimo-jupyter-extension` should be installed into the single-user containers. They are not needed by the main hub.
 
 ## Troubleshooting
 
 ### **Marimo** icon does not appear in the launcher
 
-Make sure `jupyter-marimo-proxy` is installed into the same Python environment where **Jupyter** is installed. See advanced example above.
+Make sure `marimo-jupyter-extension` is installed into the same Python environment where **Jupyter** is installed. See advanced example above.
 
 ### **Marimo** icon appears in the launcher, but fails to launch **Marimo**
 

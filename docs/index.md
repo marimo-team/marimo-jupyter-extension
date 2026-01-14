@@ -1,17 +1,17 @@
-# jupyter-marimo-proxy
+# marimo-jupyter-extension
 
 Jupyter extension that enables launching [marimo](https://marimo.io/) from JupyterLab and JupyterHub.
 
 ## What is this?
 
-`jupyter-marimo-proxy` integrates marimo into your Jupyter environment using [jupyter-server-proxy](https://jupyter-server-proxy.readthedocs.io/). It adds a marimo launcher to the JupyterLab interface, allowing users to start marimo notebooks without leaving their Jupyter environment.
+`marimo-jupyter-extension` integrates marimo into your Jupyter environment using [jupyter-server-proxy](https://jupyter-server-proxy.readthedocs.io/). It adds a marimo launcher to the JupyterLab interface, allowing users to start marimo notebooks without leaving their Jupyter environment.
 
 On JupyterHub deployments, this leverages existing authentication and spawning infrastructure—no separate marimo deployment needed.
 
 ## Quick Start
 
 ```bash
-pip install 'marimo>=0.6.21' jupyter-marimo-proxy
+pip install 'marimo>=0.6.21' marimo-jupyter-extension
 ```
 
 Launch JupyterLab and click the marimo icon in the launcher.

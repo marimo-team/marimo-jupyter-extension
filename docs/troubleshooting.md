@@ -4,7 +4,7 @@
 
 ### Marimo icon does not appear in the launcher
 
-**Cause**: `jupyter-marimo-proxy` is not installed in the same Python environment as Jupyter.
+**Cause**: `marimo-jupyter-extension` is not installed in the same Python environment as Jupyter.
 
 **Solution**: Install the proxy in Jupyter's environment:
 
@@ -13,7 +13,7 @@
 which jupyter
 
 # Install proxy in that environment
-/path/to/jupyter/bin/pip install jupyter-marimo-proxy
+/path/to/jupyter/bin/pip install marimo-jupyter-extension
 ```
 
 ### Marimo icon appears but fails to launch
@@ -29,15 +29,9 @@ which jupyter
    }
    ```
 
-2. Set the environment variable:
-   ```bash
-   export JUPYTERMARIMOPROXY_PATH="/path/to/marimo/bin:$PATH"
-   ```
-
-3. Create config file `~/.jupytermarimoproxyrc`:
-   ```ini
-   [DEFAULT]
-   path = /path/to/marimo/bin:$PATH
+2. Configure explicit path in `jupyterhub_config.py`:
+   ```python
+   c.MarimoProxyConfig.marimo_path = "/path/to/marimo"
    ```
 
 ### Marimo cannot find installed modules

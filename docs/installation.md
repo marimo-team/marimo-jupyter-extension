@@ -8,16 +8,16 @@
 
 ## Basic Installation
 
-`jupyter-marimo-proxy` requires marimo but does not declare it as a dependency, allowing flexible installation scenarios.
+`marimo-jupyter-extension` requires marimo but does not declare it as a dependency, allowing flexible installation scenarios.
 
 ```bash
-pip install 'marimo>=0.6.21' jupyter-marimo-proxy
+pip install 'marimo>=0.6.21' marimo-jupyter-extension
 ```
 
 Or with uv:
 
 ```bash
-uv add marimo jupyter-marimo-proxy
+uv add marimo marimo-jupyter-extension
 ```
 
 ## Single Python Environment
@@ -29,7 +29,7 @@ FROM quay.io/jupyterhub/jupyterhub:latest
 RUN cd /srv/jupyterhub && jupyterhub --generate-config && \
     echo "c.JupyterHub.authenticator_class = 'dummy'" >> jupyterhub_config.py && \
     echo "c.DummyAuthenticator.password = 'demo'" >> jupyterhub_config.py && \
-    pip install --no-cache-dir notebook 'marimo>=0.6.21' jupyter-marimo-proxy
+    pip install --no-cache-dir notebook 'marimo>=0.6.21' marimo-jupyter-extension
 RUN useradd -ms /bin/bash demo
 ```
 
@@ -40,7 +40,7 @@ With more complex setups (conda, virtualenvs), install packages in the correct e
 | Package | Install Location | Why |
 |---------|------------------|-----|
 | `marimo` | User's environment | Access user's packages |
-| `jupyter-marimo-proxy` | Jupyter's environment | Jupyter must import it |
+| `marimo-jupyter-extension` | Jupyter's environment | Jupyter must import it |
 
 Example with Miniforge:
 
@@ -59,8 +59,8 @@ RUN curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download
 # marimo in conda environment (user packages available)
 RUN /opt/conda/bin/pip install --no-cache-dir 'marimo>=0.6.21'
 
-# jupyter-marimo-proxy in Jupyter's environment
-RUN /usr/bin/pip install --no-cache-dir jupyter-marimo-proxy
+# marimo-jupyter-extension in Jupyter's environment
+RUN /usr/bin/pip install --no-cache-dir marimo-jupyter-extension
 
 RUN useradd -ms /bin/bash demo
 ```

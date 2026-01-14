@@ -1,5 +1,5 @@
 {
   "packageManager": "python",
-  "packageName": "jupyter-marimo-proxy",
-  "uninstallInstructions": "pip uninstall jupyter-marimo-proxy"
+  "packageName": "marimo-jupyter-extension",
+  "uninstallInstructions": "pip uninstall marimo-jupyter-extension"
 }

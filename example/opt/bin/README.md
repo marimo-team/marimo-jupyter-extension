@@ -25,7 +25,6 @@ c.SystemdSpawner.environment = {
 ## Alternative Approaches
 
 1. **PATH configuration**: Add the venv bin directly to PATH (simpler)
-2. **Environment variable**: Set `JUPYTERMARIMOPROXY_PATH`
-3. **Config file**: Use `~/.jupytermarimoproxyrc`
+2. **Traitlets config**: Set `c.MarimoProxyConfig.marimo_path` in jupyterhub_config.py
 
 See [Configuration](../../../docs/configuration.md) for details.

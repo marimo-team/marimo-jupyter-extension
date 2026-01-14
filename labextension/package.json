@@ -1,11 +1,11 @@
 {
-  "name": "@jupyter-marimo-proxy/labextension",
+  "name": "@marimo-team/jupyter-extension",
   "version": "0.1.0",
   "description": "JupyterLab extension for Marimo integration",
   "keywords": ["jupyter", "jupyterlab", "jupyterlab-extension", "marimo"],
-  "homepage": "https://github.com/marimo-team/jupyter-marimo-proxy",
+  "homepage": "https://github.com/marimo-team/marimo-jupyter-extension",
   "bugs": {
-    "url": "https://github.com/marimo-team/jupyter-marimo-proxy/issues"
+    "url": "https://github.com/marimo-team/marimo-jupyter-extension/issues"
   },
   "license": "Apache-2.0",
   "author": {
@@ -19,7 +19,7 @@
   "types": "lib/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/marimo-team/jupyter-marimo-proxy.git"
+    "url": "https://github.com/marimo-team/marimo-jupyter-extension.git"
   },
   "scripts": {
     "build": "npm run build:lib && npm run build:labextension:dev",
@@ -30,7 +30,7 @@
     "build:lib:prod": "tsc",
     "clean": "npm run clean:lib && npm run clean:labextension",
     "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
-    "clean:labextension": "rimraf ../jupyter_marimo_proxy/labextension",
+    "clean:labextension": "rimraf ../marimo_jupyter_extension/labextension",
     "watch": "run-p watch:src watch:labextension",
     "watch:src": "tsc -w --sourceMap",
     "watch:labextension": "jupyter labextension watch .",
@@ -71,7 +71,7 @@
   },
   "jupyterlab": {
     "extension": true,
-    "outputDir": "../jupyter_marimo_proxy/labextension",
+    "outputDir": "../marimo_jupyter_extension/labextension",
     "schemaDir": "schema"
   }
 }

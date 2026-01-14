@@ -2,7 +2,7 @@ import { LabIcon } from '@jupyterlab/ui-components';
 import marimoIconSvg from '../style/marimo.svg';
 
 export const marimoIcon = new LabIcon({
-  name: '@jupyter-marimo-proxy:marimo',
+  name: '@marimo-team/jupyter-extension:marimo',
   svgstr: marimoIconSvg
 });
 
@@ -19,7 +19,7 @@ const leafIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10
 </svg>`;
 
 export const leafIcon = new LabIcon({
-  name: '@jupyter-marimo-proxy:leaf',
+  name: '@marimo-team/jupyter-extension:leaf',
   svgstr: leafIconSvg
 });
 

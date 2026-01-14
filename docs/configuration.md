@@ -1,54 +1,28 @@
 # Configuration
 
-## Executable Search Path
+## Executable Discovery
 
-When marimo is installed in a different location than Jupyter, you need to configure the search path so the proxy can find it.
+By default, the extension searches for `marimo` in:
 
-### Option 1: Environment Variable
+1. System PATH (via `shutil.which`)
+2. Common locations: `~/.local/bin/marimo`, `/opt/bin/marimo`, `/usr/local/bin/marimo`
 
-Set `JUPYTERMARIMOPROXY_PATH` to include the path to marimo:
+## Traitlets Configuration
 
-```bash
-export JUPYTERMARIMOPROXY_PATH="~/.local/bin:~/bin:$PATH"
+For JupyterHub deployments, configure the extension in `jupyterhub_config.py`:
+
+```python
+from marimo_jupyter_extension.config import MarimoProxyConfig
+
+# Explicit marimo path
+c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
+
+# Or use uvx mode (runs `uvx marimo` instead)
+c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"
+
+# Startup timeout in seconds (default: 60)
+c.MarimoProxyConfig.timeout = 120
 ```
-
-!!! note "JupyterHub Configuration"
-    When using JupyterHub, add `JUPYTERMARIMOPROXY_PATH` to the spawner's preserved environment variables:
-
-    ```python
-    c.Spawner.env_keep.append('JUPYTERMARIMOPROXY_PATH')
-    ```
-
-### Option 2: Configuration File
-
-Create `~/.jupytermarimoproxyrc`:
-
-```ini
-[DEFAULT]
-path = ~/.local/bin:~/bin:$PATH
-```
-
-Or with a section name:
-
-```ini
-[jupyter-marimo-proxy]
-path = /opt/conda/bin:/usr/local/bin:$PATH
-```
-
-### Path Expansion
-
-Both methods support:
-
-- Home directory expansion: `~` → `/home/username`
-- Environment variable expansion: `$PATH`, `$HOME`
-- Path deduplication (duplicate entries removed)
-- Validation (non-existent paths removed)
-
-### Precedence
-
-1. `JUPYTERMARIMOPROXY_PATH` environment variable (highest)
-2. `~/.jupytermarimoproxyrc` config file
-3. System PATH (default)
 
 ## Spawner Environment
 
@@ -67,7 +41,7 @@ c.SystemdSpawner.environment = {
 
 ## Alternative: Symlink marimo
 
-Instead of PATH configuration, copy or symlink marimo to a location already in the spawner's PATH:
+Instead of explicit path configuration, copy or symlink marimo to a location already in the spawner's PATH:
 
 ```bash
 # As root

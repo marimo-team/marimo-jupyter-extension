@@ -4,7 +4,7 @@
 
 def test_entry_point_importable():
     """The setup function should be importable."""
-    from jupyter_marimo_proxy import setup_marimoserver
+    from marimo_jupyter_extension import setup_marimoserver
 
     assert callable(setup_marimoserver)
 

@@ -1,26 +1,17 @@
-"""Configuration for jupyter-marimo-proxy.
-
-Precedence: Traitlets (admin) > Environment variables > Defaults
-"""
+"""Configuration for marimo-jupyter-extension."""
 
 import os
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
 from traitlets import Int, Unicode, default
 from traitlets.config import Configurable
 
-# Environment variables (fallbacks when traitlets not configured)
-ENV_MARIMO_PATH = "JUPYTERMARIMOPROXY_MARIMO_PATH"
-ENV_UVX_PATH = "JUPYTERMARIMOPROXY_UVX_PATH"
-ENV_TIMEOUT = "JUPYTERMARIMOPROXY_TIMEOUT"
-
 DEFAULT_TIMEOUT = 60
 
 
 class MarimoProxyConfig(Configurable):
-    """Configuration for jupyter-marimo-proxy.
+    """Configuration for marimo-jupyter-extension.
 
     Can be configured in jupyterhub_config.py:
         c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
@@ -45,23 +36,18 @@ class MarimoProxyConfig(Configurable):
 
     @default("marimo_path")
     def _default_marimo_path(self):
-        return os.environ.get(ENV_MARIMO_PATH)
+        return None
 
     @default("uvx_path")
     def _default_uvx_path(self):
-        if path := os.environ.get(ENV_UVX_PATH):
-            return path
-        # Derive uvx from $UV if set
+        # Derive uvx from $UV if set (standard uv environment variable)
         if uv_path := os.environ.get("UV"):
             return str(Path(uv_path).parent / "uvx")
         return None
 
     @default("timeout")
     def _default_timeout(self):
-        try:
-            return int(os.environ.get(ENV_TIMEOUT, DEFAULT_TIMEOUT))
-        except ValueError:
-            return DEFAULT_TIMEOUT
+        return DEFAULT_TIMEOUT
 
 
 @dataclass(frozen=True)
@@ -75,17 +61,7 @@ class Config:
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
-    """Load configuration with precedence: Traitlets > Env vars > Defaults."""
-    # Check for deprecated rc file
-    rc_path = Path("~/.jupytermarimoproxyrc").expanduser()
-    if rc_path.exists():
-        warnings.warn(
-            f"Deprecated: {rc_path} is no longer supported. "
-            "Use environment variables or jupyterhub_config.py instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
+    """Load configuration from Traitlets or defaults."""
     # Use traitlets config if provided, otherwise create default
     cfg = traitlets_config or MarimoProxyConfig()
 

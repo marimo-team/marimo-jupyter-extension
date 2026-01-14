@@ -26,7 +26,7 @@ jobs:
         run: uv sync
 
       - name: Run tests
-        run: uv run pytest --cov=jupyter_marimo_proxy --cov-report=xml
+        run: uv run pytest --cov=marimo_jupyter_extension --cov-report=xml
 
       - name: Upload coverage
         if: matrix.python-version == '3.12'

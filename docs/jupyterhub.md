@@ -65,7 +65,7 @@ dependencies = [
     "oauthenticator>=17.3.0",
     "jupyterhub-systemdspawner>=1.0.2",
     "marimo>=0.18.4",
-    "jupyter-marimo-proxy>=0.0.4",
+    "marimo-jupyter-extension>=0.0.4",
 ]
 ```
 
