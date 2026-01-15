@@ -1,5 +1,5 @@
 import { Widget } from '@lumino/widgets';
-import { CommandRegistry } from '@lumino/commands';
+import type { CommandRegistry } from '@lumino/commands';
 import { PageConfig } from '@jupyterlab/coreutils';
 import { marimoIcon } from './icons';
 import { updateWidgetTitles } from './iframe-widget';
@@ -74,11 +74,13 @@ export class MarimoSidebar extends Widget {
       const baseUrl = this._getMarimoBaseUrl();
       const response = await fetch(`${baseUrl}api/home/running_notebooks`, {
         method: 'POST',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
       });
       if (response.ok) {
-        const data = await response.json();
-        const sessions = data.files || [];
+        const data = (await response.json()) as {
+          files?: RunningSession[];
+        };
+        const sessions = data.files ?? [];
         this._updateSessionsList(sessions);
         // Update widget tab titles based on session names
         updateWidgetTitles(sessions);
@@ -95,9 +97,9 @@ export class MarimoSidebar extends Widget {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ sessionId })
+        body: JSON.stringify({ sessionId }),
       });
       if (response.ok) {
         // Refresh the list after shutdown
@@ -113,10 +115,12 @@ export class MarimoSidebar extends Widget {
       const baseUrl = this._getMarimoBaseUrl();
       const response = await fetch(`${baseUrl}health`, {
         method: 'GET',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as {
+          status: string;
+        };
         return data.status === 'healthy';
       }
       return false;
@@ -140,7 +144,9 @@ export class MarimoSidebar extends Widget {
       }
     }
     if (this._serverControlsContainer) {
-      this._serverControlsContainer.style.display = isRunning ? 'flex' : 'none';
+      this._serverControlsContainer.style.display = isRunning
+        ? 'flex'
+        : 'none';
     }
     if (this._startServerContainer) {
       this._startServerContainer.style.display = isRunning ? 'none' : 'flex';
@@ -161,7 +167,7 @@ export class MarimoSidebar extends Widget {
           await this._refreshSessions();
           return;
         }
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
       // If we get here, the server didn't start successfully
@@ -175,7 +181,7 @@ export class MarimoSidebar extends Widget {
 
   private async _restartServer(): Promise<void> {
     const confirmRestart = window.confirm(
-      'Are you sure you want to restart the marimo server? All running sessions will be interrupted.'
+      'Are you sure you want to restart the marimo server? All running sessions will be interrupted.',
     );
     if (!confirmRestart) {
       return;
@@ -194,7 +200,7 @@ export class MarimoSidebar extends Widget {
       // Call the restart endpoint which properly manages the proxy state
       const response = await fetch(`${baseUrl}marimo-tools/restart`, {
         method: 'POST',
-        credentials: 'same-origin'
+        credentials: 'same-origin',
       });
 
       if (!response.ok) {
@@ -213,7 +219,7 @@ export class MarimoSidebar extends Widget {
     const maxAttempts = 20;
 
     for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       if (await this._isServerHealthy()) {
         this._updateServerStatus(true);
         await this._refreshSessions();
@@ -302,7 +308,8 @@ export class MarimoSidebar extends Widget {
 
     // Server controls
     this._serverControlsContainer = document.createElement('div');
-    this._serverControlsContainer.className = 'jp-MarimoSidebar-serverControls';
+    this._serverControlsContainer.className =
+      'jp-MarimoSidebar-serverControls';
 
     const restartButton = document.createElement('button');
     restartButton.className = 'jp-MarimoSidebar-serverButton jp-mod-restart';
@@ -376,7 +383,8 @@ export class MarimoSidebar extends Widget {
     // New Notebook button
     const newButton = document.createElement('button');
     newButton.className = 'jp-MarimoSidebar-button';
-    newButton.innerHTML = '<span class="jp-MarimoSidebar-buttonIcon">+</span> New Notebook';
+    newButton.innerHTML =
+      '<span class="jp-MarimoSidebar-buttonIcon">+</span> New Notebook';
     newButton.addEventListener('click', () => {
       this._commands.execute('marimo:new-notebook');
     });
@@ -385,7 +393,8 @@ export class MarimoSidebar extends Widget {
     // Open Editor button
     const openButton = document.createElement('button');
     openButton.className = 'jp-MarimoSidebar-button';
-    openButton.innerHTML = '<span class="jp-MarimoSidebar-buttonIcon">&#8599;</span> Open Editor';
+    openButton.innerHTML =
+      '<span class="jp-MarimoSidebar-buttonIcon">&#8599;</span> Open Editor';
     openButton.addEventListener('click', () => {
       this._commands.execute('marimo:open-editor');
     });

@@ -1,4 +1,8 @@
-import { ABCWidgetFactory, DocumentRegistry, DocumentWidget } from '@jupyterlab/docregistry';
+import {
+  ABCWidgetFactory,
+  type DocumentRegistry,
+  DocumentWidget,
+} from '@jupyterlab/docregistry';
 import { IFrame } from '@jupyterlab/apputils';
 import { PageConfig } from '@jupyterlab/coreutils';
 import { leafIcon } from './icons';
@@ -6,11 +10,7 @@ import { leafIcon } from './icons';
 /**
  * A widget that wraps a marimo IFrame for document viewing.
  */
-export class MarimoDocWidget extends DocumentWidget<IFrame> {
-  constructor(options: DocumentWidget.IOptions<IFrame>) {
-    super(options);
-  }
-}
+export class MarimoDocWidget extends DocumentWidget<IFrame> {}
 
 /**
  * A widget factory for marimo documents.
@@ -21,7 +21,7 @@ export class MarimoWidgetFactory extends ABCWidgetFactory<MarimoDocWidget> {
    * Create a new widget given a context.
    */
   protected createNewWidget(
-    context: DocumentRegistry.Context
+    context: DocumentRegistry.Context,
   ): MarimoDocWidget {
     const baseUrl = PageConfig.getBaseUrl();
     const marimoBaseUrl = `${baseUrl}marimo/`;
@@ -34,8 +34,8 @@ export class MarimoWidgetFactory extends ABCWidgetFactory<MarimoDocWidget> {
         'allow-forms',
         'allow-modals',
         'allow-popups',
-        'allow-downloads'
-      ]
+        'allow-downloads',
+      ],
     });
 
     content.url = `${marimoBaseUrl}?file=${encodeURIComponent(filePath)}`;
@@ -52,4 +52,4 @@ export class MarimoWidgetFactory extends ABCWidgetFactory<MarimoDocWidget> {
 /**
  * The name of the factory for marimo widgets.
  */
-export const FACTORY_NAME = 'Marimo';
+export const FACTORY_NAME = 'marimo';

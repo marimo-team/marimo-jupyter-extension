@@ -1,7 +1,7 @@
 """Integration tests that actually invoke external commands.
 
-These tests are marked with @pytest.mark.integration and are skipped by default.
-Run with: uv run pytest -m integration
+These tests are marked with @pytest.mark.integration and are skipped by
+default. Run with: uv run pytest -m integration
 """
 
 import shutil

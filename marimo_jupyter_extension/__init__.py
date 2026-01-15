@@ -1,12 +1,12 @@
 """Jupyter extension to proxy Marimo.
 
-This module provides the setup function for jupyter-server-proxy to launch marimo.
+This module provides the setup function for jupyter-server-proxy to launch
+marimo.
 """
 
 import base64
 import os
 import secrets
-from pathlib import Path
 
 from .config import get_config
 from .executable import get_marimo_command
@@ -52,6 +52,7 @@ def setup_marimoserver():
             "icon_path": os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "icon.svg"
             ),
-            "enabled": False,  # Disabled - our labextension provides the launcher
+            # Disabled - our labextension provides the launcher
+            "enabled": False,
         },
     }

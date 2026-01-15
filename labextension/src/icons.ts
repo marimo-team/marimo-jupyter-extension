@@ -3,7 +3,7 @@ import marimoIconSvg from '../style/marimo.svg';
 
 export const marimoIcon = new LabIcon({
   name: '@marimo-team/jupyter-extension:marimo',
-  svgstr: marimoIconSvg
+  svgstr: marimoIconSvg,
 });
 
 /**
@@ -20,7 +20,7 @@ const leafIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10
 
 export const leafIcon = new LabIcon({
   name: '@marimo-team/jupyter-extension:leaf',
-  svgstr: leafIconSvg
+  svgstr: leafIconSvg,
 });
 
 /**

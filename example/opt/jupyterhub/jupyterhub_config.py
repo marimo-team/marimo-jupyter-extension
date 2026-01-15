@@ -2,6 +2,10 @@ import os
 
 from oauthenticator.github import GitHubOAuthenticator
 
+# Get the JupyterHub Traitlets configuration object
+# This is injected by JupyterHub when loading this file
+c = get_config()  # noqa: F821
+
 # =============================================================================
 # Authentication
 # =============================================================================

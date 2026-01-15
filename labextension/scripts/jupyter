@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Wrapper script for jupyter command
+# Uses system jupyter if available, otherwise falls back to uv
+# (used to prevent uv deadlock on package build)
+
+if command -v jupyter &> /dev/null; then
+  # jupyter is available in PATH, use it directly
+  jupyter "$@"
+else
+  # jupyter not found, use uv to run it
+  uv run jupyter "$@"
+fi

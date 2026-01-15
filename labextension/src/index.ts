@@ -1,7 +1,7 @@
 import {
-  JupyterFrontEnd,
-  JupyterFrontEndPlugin,
-  ILayoutRestorer
+  type JupyterFrontEnd,
+  type JupyterFrontEndPlugin,
+  ILayoutRestorer,
 } from '@jupyterlab/application';
 import { InputDialog, showErrorMessage } from '@jupyterlab/apputils';
 import { ServerConnection, KernelSpecAPI } from '@jupyterlab/services';
@@ -19,12 +19,12 @@ import '../style/base.css';
 /**
  * Command IDs used by the extension.
  */
-namespace CommandIDs {
-  export const openFile = 'marimo:open-file';
-  export const convertNotebook = 'marimo:convert-notebook';
-  export const newNotebook = 'marimo:new-notebook';
-  export const openEditor = 'marimo:open-editor';
-}
+const CommandIDs = {
+  openFile: 'marimo:open-file',
+  convertNotebook: 'marimo:convert-notebook',
+  newNotebook: 'marimo:new-notebook',
+  openEditor: 'marimo:open-editor',
+} as const;
 
 /**
  * Get the base URL for the Marimo proxy.
@@ -38,7 +38,7 @@ function getMarimoBaseUrl(): string {
  * Get the selected file path from the file browser.
  */
 function getSelectedFilePath(
-  fileBrowserFactory: IFileBrowserFactory
+  fileBrowserFactory: IFileBrowserFactory,
 ): string | null {
   const browser = fileBrowserFactory.tracker.currentWidget;
   if (!browser) {
@@ -80,7 +80,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     app: JupyterFrontEnd,
     fileBrowserFactory: IFileBrowserFactory,
     launcher: ILauncher | null,
-    restorer: ILayoutRestorer | null
+    restorer: ILayoutRestorer | null,
   ) => {
     const { commands, shell } = app;
     const marimoBaseUrl = getMarimoBaseUrl();
@@ -103,7 +103,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const widget = createMarimoWidget(url, { filePath });
         shell.add(widget, 'main');
         shell.activateById(widget.id);
-      }
+      },
     });
 
     // Command: Convert Jupyter notebook to marimo
@@ -128,7 +128,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const result = await InputDialog.getText({
           title: 'Convert to marimo',
           label: 'Output filename:',
-          text: defaultOutput
+          text: defaultOutput,
         });
 
         if (!result.button.accept || !result.value) {
@@ -143,15 +143,18 @@ const plugin: JupyterFrontEndPlugin<void> = {
             `${settings.baseUrl}marimo-tools/convert`,
             {
               method: 'POST',
-              body: JSON.stringify({ input: filePath, output: outputPath })
+              body: JSON.stringify({ input: filePath, output: outputPath }),
             },
-            settings
+            settings,
           );
 
-          const result = await response.json();
+          const result = (await response.json()) as {
+            success: boolean;
+            error?: string;
+          };
 
           if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Conversion failed');
+            throw new Error(result.error ?? 'Conversion failed');
           }
 
           // Refresh the file browser to show the new file
@@ -168,10 +171,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
         } catch (error) {
           showErrorMessage(
             'Conversion failed',
-            `Failed to convert notebook: ${error}`
+            `Failed to convert notebook: ${error}`,
           );
         }
-      }
+      },
     });
 
     // Command: Create new marimo notebook
@@ -185,7 +188,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
           console.log('[marimo] Available kernels:', specs);
 
           // Extract kernel names and display names, filtering out non-venv entries
-          const kernelEntries: Array<{ name: string; displayName: string; argv: string[] }> = [];
+          const kernelEntries: Array<{
+            name: string;
+            displayName: string;
+            argv: string[];
+          }> = [];
           if (specs && specs.kernelspecs) {
             for (const [name, spec] of Object.entries(specs.kernelspecs)) {
               console.log(`[marimo] Processing kernel: ${name}`, spec);
@@ -196,13 +203,15 @@ const plugin: JupyterFrontEndPlugin<void> = {
                 // Skip entries that are just "python" or "python3" (not a venv path)
                 // A venv path contains a directory separator
                 if (!pythonPath.includes('/') && !pythonPath.includes('\\')) {
-                  console.log(`[marimo] Skipping non-venv kernel: ${name} (${pythonPath})`);
+                  console.log(
+                    `[marimo] Skipping non-venv kernel: ${name} (${pythonPath})`,
+                  );
                   continue;
                 }
                 kernelEntries.push({
                   name,
                   displayName: (spec.display_name as string) || name,
-                  argv
+                  argv,
                 });
               }
             }
@@ -213,19 +222,24 @@ const plugin: JupyterFrontEndPlugin<void> = {
           // If no venv kernels, skip dropdown and open marimo directly
           if (kernelEntries.length === 0) {
             console.log('[marimo] No venv kernels, opening directly');
-            const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+            const widget = createMarimoWidget(marimoBaseUrl, {
+              label: 'New Notebook',
+            });
             shell.add(widget, 'main');
             shell.activateById(widget.id);
             return;
           }
 
           // Show dropdown dialog to select kernel, with "Default" as first option
-          const items = ['Default (no venv)', ...kernelEntries.map(k => k.displayName)];
+          const items = [
+            'Default (no venv)',
+            ...kernelEntries.map((k) => k.displayName),
+          ];
           const kernelResult = await InputDialog.getItem({
             title: 'Select Python Environment',
             label: 'Kernel:',
             items,
-            current: 0
+            current: 0,
           });
 
           // If user cancelled or no selection, return early
@@ -235,21 +249,25 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           // If "Default" selected, open marimo directly (no file creation)
           if (kernelResult.value === 'Default (no venv)') {
-            const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+            const widget = createMarimoWidget(marimoBaseUrl, {
+              label: 'New Notebook',
+            });
             shell.add(widget, 'main');
             shell.activateById(widget.id);
             return;
           }
 
           // Get venv path from selected kernel
-          const selectedKernel = kernelEntries.find(k => k.displayName === kernelResult.value);
+          const selectedKernel = kernelEntries.find(
+            (k) => k.displayName === kernelResult.value,
+          );
           const venv = selectedKernel?.argv[0];
 
           // Prompt for notebook name
           const nameResult = await InputDialog.getText({
             title: 'New marimo Notebook',
             label: 'Notebook name:',
-            text: 'untitled.py'
+            text: 'untitled.py',
           });
 
           if (!nameResult.button.accept || !nameResult.value) {
@@ -272,9 +290,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
             `${settings.baseUrl}marimo-tools/create-stub`,
             {
               method: 'POST',
-              body: JSON.stringify({ path: filePath, venv })
+              body: JSON.stringify({ path: filePath, venv }),
             },
-            settings
+            settings,
           );
 
           const result = await response.json();
@@ -294,12 +312,17 @@ const plugin: JupyterFrontEndPlugin<void> = {
           shell.activateById(widget.id);
         } catch (error) {
           // Fall back to opening marimo directly on any error
-          console.warn('[marimo] Error during notebook creation, falling back:', error);
-          const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+          console.warn(
+            '[marimo] Error during notebook creation, falling back:',
+            error,
+          );
+          const widget = createMarimoWidget(marimoBaseUrl, {
+            label: 'New Notebook',
+          });
           shell.add(widget, 'main');
           shell.activateById(widget.id);
         }
-      }
+      },
     });
 
     // Command: Open marimo editor (in new tab)
@@ -309,20 +332,20 @@ const plugin: JupyterFrontEndPlugin<void> = {
       icon: marimoIcon,
       execute: () => {
         window.open(marimoBaseUrl, '_blank');
-      }
+      },
     });
 
     // Add context menu items programmatically for proper visibility support
     app.contextMenu.addItem({
       command: CommandIDs.openFile,
       selector: '.jp-DirListing-item[data-isdir="false"]',
-      rank: 50
+      rank: 50,
     });
 
     app.contextMenu.addItem({
       command: CommandIDs.convertNotebook,
       selector: '.jp-DirListing-item[data-isdir="false"]',
-      rank: 51
+      rank: 51,
     });
 
     // Add to launcher if available
@@ -331,14 +354,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
         command: CommandIDs.newNotebook,
         category: 'Notebook',
         rank: 3,
-        kernelIconUrl: leafIconUrl
+        kernelIconUrl: leafIconUrl,
       });
 
       launcher.add({
         command: CommandIDs.openEditor,
         category: 'Other',
         rank: 1,
-        kernelIconUrl: marimoIconUrl
+        kernelIconUrl: marimoIconUrl,
       });
     }
 
@@ -355,10 +378,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const widgetFactory = new MarimoWidgetFactory({
       name: FACTORY_NAME,
       fileTypes: ['python'],
-      defaultFor: []  // Not the default editor, just available in "Open With"
+      defaultFor: [], // Not the default editor, just available in "Open With"
     });
     app.docRegistry.addWidgetFactory(widgetFactory);
-  }
+  },
 };
 
 export default plugin;

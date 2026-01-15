@@ -1,15 +1,13 @@
 """Jupyter server extension handlers for marimo tools."""
 
 import json
-import subprocess
 from pathlib import Path
 
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
 
-from .config import get_config
-from .executable import get_marimo_command
+from .convert import convert_notebook_to_marimo
 
 
 def _find_marimo_proxy_state(web_app):
@@ -47,22 +45,12 @@ class ConvertHandler(JupyterHandler):
             )
             return
 
-        config = get_config()
-        marimo_cmd = get_marimo_command(config)
-
-        result = subprocess.run(
-            [*marimo_cmd, "convert", input_path, "-o", output_path],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode == 0:
+        try:
+            convert_notebook_to_marimo(input_path, output_path)
             self.finish({"success": True, "output": output_path})
-        else:
+        except RuntimeError as e:
             self.set_status(500)
-            self.finish(
-                {"success": False, "error": result.stderr or result.stdout}
-            )
+            self.finish({"success": False, "error": str(e)})
 
 
 class RestartHandler(JupyterHandler):

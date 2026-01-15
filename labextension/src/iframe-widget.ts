@@ -13,7 +13,7 @@ const widgetsByInitId = new Map<string, MainAreaWidget<IFrame>>();
  */
 export function createMarimoWidget(
   url: string,
-  options: { filePath?: string; label?: string } = {}
+  options: { filePath?: string; label?: string } = {},
 ): MainAreaWidget<IFrame> {
   const { filePath, label } = options;
 
@@ -24,15 +24,15 @@ export function createMarimoWidget(
       'allow-forms',
       'allow-modals',
       'allow-popups',
-      'allow-downloads'
-    ]
+      'allow-downloads',
+    ],
   });
 
   // Generate initializationId for new notebooks (include __new__ prefix to match marimo API)
   const initId = filePath ? null : `__new__${UUID.uuid4()}`;
 
   // Build the URL with file parameter
-  const finalUrl = filePath ? url : url + `?file=${initId}`;
+  const finalUrl = filePath ? url : `${url}?file=${initId}`;
   content.url = finalUrl;
   content.addClass('jp-MarimoWidget');
 
@@ -69,7 +69,7 @@ export function createMarimoWidget(
  * Called by the sidebar when it polls for running notebooks.
  */
 export function updateWidgetTitles(
-  sessions: Array<{ initializationId: string; name: string; path: string }>
+  sessions: { initializationId: string; name: string; path: string }[],
 ): void {
   for (const session of sessions) {
     const widget = widgetsByInitId.get(session.initializationId);
