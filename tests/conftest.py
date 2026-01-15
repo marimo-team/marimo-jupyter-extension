@@ -50,7 +50,9 @@ def mock_marimo_in_path(temp_bin_dir):
 @pytest.fixture
 def mock_marimo_not_in_path():
     """Mock shutil.which to return None (marimo not found)."""
-    with patch("marimo_jupyter_extension.executable.shutil.which", return_value=None):
+    with patch(
+        "marimo_jupyter_extension.executable.shutil.which", return_value=None
+    ):
         with patch(
             "marimo_jupyter_extension.executable.COMMON_LOCATIONS",
             ["/nonexistent/path/marimo"],

@@ -1,8 +1,6 @@
 """Tests for the setup_marimoserver() function."""
 
 import os
-from pathlib import Path
-
 
 
 class TestSetupMarimoserver:
@@ -28,7 +26,9 @@ class TestSetupMarimoserver:
         assert isinstance(result["command"], list)
         assert all(isinstance(arg, str) for arg in result["command"])
 
-    def test_command_includes_edit_subcommand(self, clean_env, mock_marimo_in_path):
+    def test_command_includes_edit_subcommand(
+        self, clean_env, mock_marimo_in_path
+    ):
         """Command should include 'edit' subcommand."""
         from marimo_jupyter_extension import setup_marimoserver
 
@@ -36,7 +36,9 @@ class TestSetupMarimoserver:
 
         assert "edit" in result["command"]
 
-    def test_command_includes_port_placeholder(self, clean_env, mock_marimo_in_path):
+    def test_command_includes_port_placeholder(
+        self, clean_env, mock_marimo_in_path
+    ):
         """Command should include {port} placeholder for jupyter-server-proxy."""
         from marimo_jupyter_extension import setup_marimoserver
 
@@ -44,7 +46,9 @@ class TestSetupMarimoserver:
 
         assert "{port}" in result["command"]
 
-    def test_command_includes_headless_flag(self, clean_env, mock_marimo_in_path):
+    def test_command_includes_headless_flag(
+        self, clean_env, mock_marimo_in_path
+    ):
         """Command should include --headless flag."""
         from marimo_jupyter_extension import setup_marimoserver
 

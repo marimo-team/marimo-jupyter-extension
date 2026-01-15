@@ -69,7 +69,9 @@ class TestGetMarimoCommand:
 
         assert result == [mock_marimo_in_path]
 
-    def test_marimo_not_found_raises_error(self, clean_env, mock_marimo_not_in_path):
+    def test_marimo_not_found_raises_error(
+        self, clean_env, mock_marimo_not_in_path
+    ):
         """When marimo not found anywhere, should raise FileNotFoundError."""
         from marimo_jupyter_extension.config import Config
         from marimo_jupyter_extension.executable import get_marimo_command
@@ -115,7 +117,9 @@ class TestFindMarimo:
 
         assert result == str(marimo_path)
 
-    def test_returns_none_when_not_found(self, clean_env, mock_marimo_not_in_path):
+    def test_returns_none_when_not_found(
+        self, clean_env, mock_marimo_not_in_path
+    ):
         """Should return None when marimo not found anywhere."""
         from marimo_jupyter_extension.executable import _find_marimo
 

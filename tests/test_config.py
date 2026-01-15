@@ -26,7 +26,10 @@ class TestMarimoProxyConfig:
 
     def test_default_timeout(self, clean_env):
         """Default timeout should be 60 seconds."""
-        from marimo_jupyter_extension.config import MarimoProxyConfig, DEFAULT_TIMEOUT
+        from marimo_jupyter_extension.config import (
+            DEFAULT_TIMEOUT,
+            MarimoProxyConfig,
+        )
 
         config = MarimoProxyConfig()
 
@@ -48,7 +51,7 @@ class TestGetConfig:
 
     def test_returns_config_dataclass(self, clean_env, mock_marimo_in_path):
         """get_config() should return a Config dataclass."""
-        from marimo_jupyter_extension.config import get_config, Config
+        from marimo_jupyter_extension.config import Config, get_config
 
         result = get_config()
 
@@ -85,7 +88,10 @@ class TestGetConfig:
 
     def test_traitlets_config_applied(self, clean_env, mock_marimo_in_path):
         """Traitlets config should be applied to get_config result."""
-        from marimo_jupyter_extension.config import get_config, MarimoProxyConfig
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
 
         traitlets_config = MarimoProxyConfig()
         traitlets_config.marimo_path = "/traitlets/marimo"

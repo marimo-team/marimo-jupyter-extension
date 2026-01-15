@@ -1,4 +1,5 @@
 import os
+
 from oauthenticator.github import GitHubOAuthenticator
 
 # =============================================================================
@@ -7,7 +8,9 @@ from oauthenticator.github import GitHubOAuthenticator
 c.JupyterHub.authenticator_class = GitHubOAuthenticator
 c.GitHubOAuthenticator.client_id = os.environ.get("GITHUB_CLIENT_ID")
 c.GitHubOAuthenticator.client_secret = os.environ.get("GITHUB_CLIENT_SECRET")
-c.GitHubOAuthenticator.oauth_callback_url = os.environ.get("OAUTH_CALLBACK_URL")
+c.GitHubOAuthenticator.oauth_callback_url = os.environ.get(
+    "OAUTH_CALLBACK_URL"
+)
 c.GitHubOAuthenticator.allowed_users = {"your-github-username"}
 c.GitHubOAuthenticator.scope = ["read:org"]
 # c.GitHubOAuthenticator.allowed_orgs = {"your-org"}
@@ -29,9 +32,7 @@ c.SystemdSpawner.user_workingdir = "/opt/notebooks/{USERNAME}"
 # =============================================================================
 # HTTP Proxy
 # =============================================================================
-c.ConfigurableHTTPProxy.command = (
-    "/opt/jupyterhub/node_modules/configurable-http-proxy/bin/configurable-http-proxy"
-)
+c.ConfigurableHTTPProxy.command = "/opt/jupyterhub/node_modules/configurable-http-proxy/bin/configurable-http-proxy"
 
 # =============================================================================
 # Spawned notebook environment

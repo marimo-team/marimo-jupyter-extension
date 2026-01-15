@@ -31,6 +31,7 @@ def setup_marimoserver():
         "command": [
             *marimo_cmd,
             "edit",
+            "--sandbox",
             "--port",
             "{port}",
             "--base-url",

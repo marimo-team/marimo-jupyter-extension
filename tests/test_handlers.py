@@ -1,6 +1,5 @@
 """Tests for the handlers module."""
 
-import pytest
 
 
 class TestHandlers:
@@ -14,7 +13,9 @@ class TestHandlers:
 
     def test_extension_points_function_exists(self):
         """Test that _jupyter_server_extension_points exists."""
-        from marimo_jupyter_extension.handlers import _jupyter_server_extension_points
+        from marimo_jupyter_extension.handlers import (
+            _jupyter_server_extension_points,
+        )
 
         result = _jupyter_server_extension_points()
         assert isinstance(result, list)
@@ -23,7 +24,9 @@ class TestHandlers:
 
     def test_load_extension_function_exists(self):
         """Test that _load_jupyter_server_extension exists."""
-        from marimo_jupyter_extension.handlers import _load_jupyter_server_extension
+        from marimo_jupyter_extension.handlers import (
+            _load_jupyter_server_extension,
+        )
 
         assert callable(_load_jupyter_server_extension)
 
