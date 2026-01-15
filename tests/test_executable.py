@@ -10,7 +10,7 @@ class TestGetMarimoCommand:
     """Test suite for get_marimo_command() function."""
 
     def test_uvx_mode_with_uvx_path(self, clean_env):
-        """When uvx_path is set, should return [uvx_path, 'marimo[sandbox]==0.19.4']."""
+        """When uvx_path set, return [uvx_path, 'marimo[sandbox]==0.19.4']."""
         from marimo_jupyter_extension.config import Config
         from marimo_jupyter_extension.executable import get_marimo_command
 
@@ -40,7 +40,7 @@ class TestGetMarimoCommand:
         assert result == ["/opt/bin/marimo"]
 
     def test_uvx_takes_precedence_over_marimo_path(self, clean_env):
-        """When both uvx_path and marimo_path are set, uvx_path takes precedence."""
+        """When both uvx_path and marimo_path set, uvx_path wins."""
         from marimo_jupyter_extension.config import Config
         from marimo_jupyter_extension.executable import get_marimo_command
 

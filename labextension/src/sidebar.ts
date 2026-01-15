@@ -85,8 +85,8 @@ export class MarimoSidebar extends Widget {
         // Update widget tab titles based on session names
         updateWidgetTitles(sessions);
       }
-    } catch (error) {
-      console.error('Failed to fetch marimo sessions:', error);
+    } catch {
+      // Silently fail - server may not be running
     }
   }
 
@@ -105,8 +105,8 @@ export class MarimoSidebar extends Widget {
         // Refresh the list after shutdown
         await this._refreshSessions();
       }
-    } catch (error) {
-      console.error('Failed to shutdown session:', error);
+    } catch {
+      // Silently fail - session may have already ended
     }
   }
 
@@ -171,10 +171,8 @@ export class MarimoSidebar extends Widget {
       }
 
       // If we get here, the server didn't start successfully
-      console.warn('Server start timed out');
       this._updateServerStatus(false);
-    } catch (error) {
-      console.error('Failed to start server:', error);
+    } catch {
       this._updateServerStatus(false);
     }
   }
@@ -209,8 +207,7 @@ export class MarimoSidebar extends Widget {
 
       // Wait for the server to come back up
       await this._waitForServer();
-    } catch (error) {
-      console.error('Failed to restart server:', error);
+    } catch {
       this._updateServerStatus(false);
     }
   }
@@ -228,7 +225,6 @@ export class MarimoSidebar extends Widget {
     }
 
     // If we get here, the server didn't come back up
-    console.warn('Server restart timed out');
     this._updateServerStatus(false);
   }
 

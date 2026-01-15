@@ -185,43 +185,37 @@ const plugin: JupyterFrontEndPlugin<void> = {
         try {
           // Fetch available kernel specs
           const specs = await KernelSpecAPI.getSpecs();
-          console.log('[marimo] Available kernels:', specs);
 
           // Extract kernel names and display names, filtering out non-venv entries
-          const kernelEntries: Array<{
+          const kernelEntries: {
             name: string;
             displayName: string;
             argv: string[];
-          }> = [];
-          if (specs && specs.kernelspecs) {
+          }[] = [];
+          if (specs?.kernelspecs) {
             for (const [name, spec] of Object.entries(specs.kernelspecs)) {
-              console.log(`[marimo] Processing kernel: ${name}`, spec);
-              if (!spec) continue;
-              const argv = (spec.argv as string[]) || [];
+              if (!spec) {
+                continue;
+              }
+              const argv = spec.argv ?? [];
               if (argv.length > 0) {
                 const pythonPath = argv[0];
                 // Skip entries that are just "python" or "python3" (not a venv path)
                 // A venv path contains a directory separator
                 if (!pythonPath.includes('/') && !pythonPath.includes('\\')) {
-                  console.log(
-                    `[marimo] Skipping non-venv kernel: ${name} (${pythonPath})`,
-                  );
                   continue;
                 }
                 kernelEntries.push({
                   name,
-                  displayName: (spec.display_name as string) || name,
+                  displayName: spec.display_name ?? name,
                   argv,
                 });
               }
             }
           }
 
-          console.log('[marimo] Found venv kernels:', kernelEntries);
-
           // If no venv kernels, skip dropdown and open marimo directly
           if (kernelEntries.length === 0) {
-            console.log('[marimo] No venv kernels, opening directly');
             const widget = createMarimoWidget(marimoBaseUrl, {
               label: 'New Notebook',
             });
@@ -295,9 +289,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
             settings,
           );
 
-          const result = await response.json();
+          const result = (await response.json()) as {
+            success: boolean;
+            error?: string;
+          };
           if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to create notebook');
+            throw new Error(result.error ?? 'Failed to create notebook');
           }
 
           // Refresh file browser
@@ -310,12 +307,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
           const widget = createMarimoWidget(url, { filePath });
           shell.add(widget, 'main');
           shell.activateById(widget.id);
-        } catch (error) {
+        } catch {
           // Fall back to opening marimo directly on any error
-          console.warn(
-            '[marimo] Error during notebook creation, falling back:',
-            error,
-          );
           const widget = createMarimoWidget(marimoBaseUrl, {
             label: 'New Notebook',
           });

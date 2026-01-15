@@ -7,7 +7,7 @@ class TestSetupMarimoserver:
     """Test suite for setup_marimoserver() return value structure."""
 
     def test_returns_required_keys(self, clean_env, mock_marimo_in_path):
-        """setup_marimoserver should return all required keys for jupyter-server-proxy."""
+        """setup_marimoserver returns keys for jupyter-server-proxy."""
         from marimo_jupyter_extension import setup_marimoserver
 
         result = setup_marimoserver()
@@ -39,7 +39,7 @@ class TestSetupMarimoserver:
     def test_command_includes_port_placeholder(
         self, clean_env, mock_marimo_in_path
     ):
-        """Command should include {port} placeholder for jupyter-server-proxy."""
+        """Command should include {port} placeholder for server-proxy."""
         from marimo_jupyter_extension import setup_marimoserver
 
         result = setup_marimoserver()
@@ -66,7 +66,7 @@ class TestSetupMarimoserver:
         assert result["timeout"] > 0
 
     def test_launcher_entry_disabled(self, clean_env, mock_marimo_in_path):
-        """Launcher entry should be disabled (labextension provides the launcher)."""
+        """Launcher entry should be disabled (labextension provides it)."""
         from marimo_jupyter_extension import setup_marimoserver
 
         result = setup_marimoserver()
