@@ -123,6 +123,10 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "W"]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"example/*" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
