@@ -11,7 +11,7 @@ On JupyterHub deployments, this leverages existing authentication and spawning i
 ## Quick Start
 
 ```bash
-pip install 'marimo>=0.6.21' marimo-jupyter-extension
+pip install 'marimo>=0.19.4' marimo-jupyter-extension
 ```
 
 Launch JupyterLab and click the marimo icon in the launcher.
@@ -19,8 +19,12 @@ Launch JupyterLab and click the marimo icon in the launcher.
 ## Features
 
 - **JupyterLab Integration**: marimo appears in the launcher with its own icon
+- **Sidebar Panel**: Server status, running sessions, and quick actions
+- **Venv Selection**: Choose Python environment when creating new notebooks
+- **Context Menus**: Right-click to edit .py files or convert .ipynb files
 - **JupyterHub Support**: Works with existing authenticators and spawners
 - **Secure**: Token-based authentication between proxy and marimo
+- **Sandbox Mode**: Run marimo in isolated environments with uvx
 - **Flexible PATH**: Configure executable search paths via environment variables or config files
 
 ## Next Steps

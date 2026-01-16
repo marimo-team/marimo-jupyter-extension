@@ -4,12 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marimo-jupyter-extension"
-version = "0.1.0"
+version = "0.0.0"
 description = "Jupyter extension to proxy marimo with JupyterLab integration"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
-    { name = "Jiang Yio" }
+    { name = "Marimo Team" },
+    { name = "Jiang Yio" },   # Original Author; thank you !
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -32,15 +33,14 @@ dependencies = [
     "traitlets>=5.0",
     "uv>=0.4",
     "nbconvert>=7.0",
-    "polars>=1.37.1",
-    "matplotlib>=3.10.8",
-    "numpy>=2.2.6",
+    "pyzmq>=27.1.0",  # if marimo is provided, we additionally need this.
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "ruff>=0.8.0",
 ]
 docs = [
     "mkdocs>=1.5",

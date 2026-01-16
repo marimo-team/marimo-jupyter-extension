@@ -20,20 +20,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: labextension/package-lock.json
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting (Biome)
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Run linters (Biome + ESLint)
-        run: npm run lint:check
+        run: pnpm run lint:check
 
       - name: Type check
-        run: npm run typecheck
+        run: pnpm run typecheck
 
   lint-python:
     name: Python

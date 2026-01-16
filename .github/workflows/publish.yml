@@ -24,14 +24,19 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Install build tools
         run: pip install build hatch hatch-jupyter-builder
 
       - name: Build labextension
         run: |
           cd labextension
-          npm install
-          npm run build:prod
+          pnpm install
+          pnpm run build:prod
 
       - name: Build package
         run: python -m build
