@@ -8,7 +8,7 @@ import { ServerConnection, KernelSpecAPI } from '@jupyterlab/services';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { PageConfig } from '@jupyterlab/coreutils';
-import { type DocumentRegistry } from '@jupyterlab/docregistry';
+import type { DocumentRegistry } from '@jupyterlab/docregistry';
 
 import { createMarimoWidget } from './iframe-widget';
 import { MarimoSidebar } from './sidebar';
@@ -69,20 +69,20 @@ function isNotebookFile(path: string): boolean {
 }
 
 /**
- * Check if a file path is a Marimo notebook (.mo.py).
+ * Check if a file path is a Marimo notebook (_mo.py).
  */
 function isMarimoFile(path: string): boolean {
-  return path.endsWith('.mo.py');
+  return path.endsWith('_mo.py');
 }
 
 /**
- * The Marimo file type for .mo.py files.
+ * The Marimo file type for _mo.py files.
  */
 const marimoFileType: Partial<DocumentRegistry.IFileType> = {
   name: 'marimo',
   displayName: 'Marimo Notebook',
   mimeTypes: ['text/x-python'],
-  extensions: ['.mo.py'],
+  extensions: ['_mo.py'],
   fileFormat: 'text',
   contentType: 'file',
   icon: marimoFileIcon,
@@ -106,7 +106,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const { commands, shell } = app;
     const marimoBaseUrl = getMarimoBaseUrl();
 
-    // Register the Marimo file type for .mo.py files
+    // Register the Marimo file type for _mo.py files
     app.docRegistry.addFileType(marimoFileType as DocumentRegistry.IFileType);
 
     // Command: Edit Python file with marimo
@@ -285,7 +285,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           const nameResult = await InputDialog.getText({
             title: 'New marimo Notebook',
             label: 'Notebook name:',
-            text: 'untitled.mo.py',
+            text: 'untitled_mo.py',
           });
 
           if (!nameResult.button.accept || !nameResult.value) {
@@ -294,7 +294,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           let filename = nameResult.value;
           if (!filename.endsWith('.py')) {
-            filename += '.mo.py';
+            filename += '_mo.py';
           }
 
           // Get current directory from file browser
@@ -395,7 +395,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const widgetFactory = new MarimoWidgetFactory({
       name: FACTORY_NAME,
       fileTypes: ['marimo', 'python'],
-      defaultFor: ['marimo'], // Default for .mo.py files, "Open With" for .py files
+      defaultFor: ['marimo'], // Default for _mo.py files, "Open With" for .py files
     });
     app.docRegistry.addWidgetFactory(widgetFactory);
   },

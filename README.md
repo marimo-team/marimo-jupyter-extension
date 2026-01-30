@@ -19,7 +19,7 @@
 **Highlights**
 
 - 🚀 **Launcher Integration** - marimo appears in the JupyterLab launcher with its own icon
-- 🍃 **First-Class Marimo Notebook Support** - Double-click `.mo.py` files to open directly in marimo
+- 🍃 **First-Class Marimo Notebook Support** - Double-click `_mo.py` files to open directly in marimo
 - 📊 **Sidebar Panel** - Monitor server status, view running sessions, and quick actions
 - 🐍 **Venv Selection** - Choose Python environment when creating new notebooks (with PEP 723 metadata)
 - 📁 **Context Menus** - Right-click `.py` files to edit with marimo, `.ipynb` files to convert
@@ -55,12 +55,12 @@ When creating a new notebook, select from available Python environments. The ext
 
 | File Type | Double-click Behavior | "Open With" Menu |
 |-----------|----------------------|------------------|
-| `.mo.py`  | Opens in marimo      | marimo available |
+| `_mo.py`  | Opens in marimo      | marimo available |
 | `.py`     | Opens in standard editor | marimo available |
 
 ### Context Menu Actions
 
-- **Edit with marimo**: Right-click any `.py` or `.mo.py` file to open it in the marimo editor
+- **Edit with marimo**: Right-click any `.py` or `_mo.py` file to open it in the marimo editor
 - **Convert to marimo**: Right-click any `.ipynb` file to convert it to marimo format
 
 ## Installation
