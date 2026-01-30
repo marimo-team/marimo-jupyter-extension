@@ -12,7 +12,12 @@ import type { DocumentRegistry } from '@jupyterlab/docregistry';
 
 import { createMarimoWidget } from './iframe-widget';
 import { MarimoSidebar } from './sidebar';
-import { marimoIcon, marimoFileIcon, marimoIconUrl, leafIconUrl } from './icons';
+import {
+  marimoIcon,
+  marimoFileIcon,
+  marimoIconUrl,
+  leafIconUrl,
+} from './icons';
 import { MarimoWidgetFactory, FACTORY_NAME } from './widget-factory';
 
 import '../style/base.css';
