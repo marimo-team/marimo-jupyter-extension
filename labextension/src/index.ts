@@ -77,12 +77,17 @@ function isMarimoFile(path: string): boolean {
 
 /**
  * The Marimo file type for _mo.py files.
+ * Note: We use `pattern` instead of relying solely on `extensions` because
+ * JupyterLab's extname() extracts everything after the first dot, so for
+ * `script_mo.py` it extracts `.py`, not `_mo.py`. The pattern regex handles
+ * the `_mo` suffix correctly.
  */
 const marimoFileType: Partial<DocumentRegistry.IFileType> = {
   name: 'marimo',
   displayName: 'Marimo Notebook',
   mimeTypes: ['text/x-python'],
-  extensions: ['_mo.py'],
+  extensions: ['.py'],
+  pattern: '.*_mo\\.py$',
   fileFormat: 'text',
   contentType: 'file',
   icon: marimoFileIcon,
@@ -285,7 +290,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           const nameResult = await InputDialog.getText({
             title: 'New marimo Notebook',
             label: 'Notebook name:',
-            text: 'untitled_mo.py',
+            text: 'untitled.py',
           });
 
           if (!nameResult.button.accept || !nameResult.value) {
