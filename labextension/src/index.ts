@@ -8,10 +8,16 @@ import { ServerConnection, KernelSpecAPI } from '@jupyterlab/services';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { PageConfig } from '@jupyterlab/coreutils';
+import type { DocumentRegistry } from '@jupyterlab/docregistry';
 
 import { createMarimoWidget } from './iframe-widget';
 import { MarimoSidebar } from './sidebar';
-import { marimoIcon, marimoIconUrl, leafIconUrl } from './icons';
+import {
+  marimoIcon,
+  marimoFileIcon,
+  marimoIconUrl,
+  leafIconUrl,
+} from './icons';
 import { MarimoWidgetFactory, FACTORY_NAME } from './widget-factory';
 
 import '../style/base.css';
@@ -68,6 +74,31 @@ function isNotebookFile(path: string): boolean {
 }
 
 /**
+ * Check if a file path is a Marimo notebook (_mo.py).
+ */
+function isMarimoFile(path: string): boolean {
+  return path.endsWith('_mo.py');
+}
+
+/**
+ * The Marimo file type for _mo.py files.
+ * Note: We use `pattern` instead of relying solely on `extensions` because
+ * JupyterLab's extname() extracts everything after the first dot, so for
+ * `script_mo.py` it extracts `.py`, not `_mo.py`. The pattern regex handles
+ * the `_mo` suffix correctly.
+ */
+const marimoFileType: Partial<DocumentRegistry.IFileType> = {
+  name: 'marimo',
+  displayName: 'Marimo Notebook',
+  mimeTypes: ['text/x-python'],
+  extensions: ['.py'],
+  pattern: '.*_mo\\.py$',
+  fileFormat: 'text',
+  contentType: 'file',
+  icon: marimoFileIcon,
+};
+
+/**
  * The main plugin that provides marimo integration.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
@@ -85,6 +116,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const { commands, shell } = app;
     const marimoBaseUrl = getMarimoBaseUrl();
 
+    // Register the Marimo file type for _mo.py files
+    app.docRegistry.addFileType(marimoFileType as DocumentRegistry.IFileType);
+
     // Command: Edit Python file with marimo
     commands.addCommand(CommandIDs.openFile, {
       label: 'Edit with marimo',
@@ -92,7 +126,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       icon: marimoIcon,
       isVisible: () => {
         const path = getSelectedFilePath(fileBrowserFactory);
-        return path !== null && isPythonFile(path);
+        return path !== null && (isPythonFile(path) || isMarimoFile(path));
       },
       execute: () => {
         const filePath = getSelectedFilePath(fileBrowserFactory);
@@ -270,7 +304,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           let filename = nameResult.value;
           if (!filename.endsWith('.py')) {
-            filename += '.py';
+            filename += '_mo.py';
           }
 
           // Get current directory from file browser
@@ -367,11 +401,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
       restorer.add(sidebar, 'marimo-sidebar');
     }
 
-    // Register widget factory for "Open With" menu
+    // Register widget factory for Marimo files and "Open With" menu for Python files
     const widgetFactory = new MarimoWidgetFactory({
       name: FACTORY_NAME,
-      fileTypes: ['python'],
-      defaultFor: [], // Not the default editor, just available in "Open With"
+      fileTypes: ['marimo', 'python'],
+      defaultFor: ['marimo'], // Default for _mo.py files, "Open With" for .py files
     });
     app.docRegistry.addWidgetFactory(widgetFactory);
   },
