@@ -206,7 +206,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
 
           // Open the converted file in marimo
-          const widget = createMarimoWidget(marimoBaseUrl, { filePath: outputPath });
+          const widget = createMarimoWidget(marimoBaseUrl, {
+            filePath: outputPath,
+          });
           shell.add(widget, 'main');
           shell.activateById(widget.id);
         } catch (error) {
@@ -376,14 +378,21 @@ const plugin: JupyterFrontEndPlugin<void> = {
                     const data = (await sessionsResponse.json()) as {
                       files?: { sessionId: string; path: string }[];
                     };
-                    const session = data.files?.find((s) => s.path === filePath);
+                    const session = data.files?.find(
+                      (s) => s.path === filePath,
+                    );
                     if (session) {
-                      await fetch(`${marimoBaseUrl}api/home/shutdown_session`, {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ sessionId: session.sessionId }),
-                      });
+                      await fetch(
+                        `${marimoBaseUrl}api/home/shutdown_session`,
+                        {
+                          method: 'POST',
+                          credentials: 'same-origin',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            sessionId: session.sessionId,
+                          }),
+                        },
+                      );
                     }
                   }
                 } catch {

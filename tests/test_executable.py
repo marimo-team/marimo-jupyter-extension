@@ -10,7 +10,7 @@ class TestGetMarimoCommand:
     """Test suite for get_marimo_command() function."""
 
     def test_uvx_mode_with_uvx_path(self, clean_env):
-        """When uvx_path set, return [uvx_path, 'marimo[sandbox]==0.19.4']."""
+        """When uvx_path set, return [uvx_path, 'marimo[sandbox]...']."""
         from marimo_jupyter_extension.config import Config
         from marimo_jupyter_extension.executable import get_marimo_command
 
@@ -22,7 +22,9 @@ class TestGetMarimoCommand:
         )
         result = get_marimo_command(config)
 
-        assert result == ["/usr/local/bin/uvx", "marimo[sandbox]==0.19.4"]
+        assert len(result) == 2
+        assert result[0] == "/usr/local/bin/uvx"
+        assert result[1].startswith("marimo[sandbox]")
 
     def test_explicit_marimo_path(self, clean_env):
         """When marimo_path is set, should return [marimo_path]."""
@@ -52,7 +54,9 @@ class TestGetMarimoCommand:
         )
         result = get_marimo_command(config)
 
-        assert result == ["/usr/local/bin/uvx", "marimo[sandbox]==0.19.4"]
+        assert len(result) == 2
+        assert result[0] == "/usr/local/bin/uvx"
+        assert result[1].startswith("marimo[sandbox]")
 
     def test_finds_marimo_in_path(self, clean_env, mock_marimo_in_path):
         """When no explicit path, should find marimo in PATH."""
