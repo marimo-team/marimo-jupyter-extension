@@ -30,6 +30,8 @@ BOLD='\033[1m'
 
 # Configuration
 TEST_ENV_DIR=".test-envs"
+STATE_FILE="$TEST_ENV_DIR/.state"
+KEEP_ENVIRONMENTS=false
 CONDA_ENVS_DIR="$TEST_ENV_DIR/conda-envs"
 CONDA_PKGS_DIR="$TEST_ENV_DIR/conda-pkgs"
 
@@ -78,6 +80,7 @@ ${BOLD}Options:${NC}
   --no-marimo     Don't install marimo in the preceding environment
   --with PKG      Install PKG in the preceding environment (can be repeated)
   --sink          Kitchen sink: 7 envs (venv/virtualenv/conda x marimo/no-marimo + venv-numpy)
+  --keep          Don't clean up environments when JupyterLab exits
   --help          Show this help message
 
 ${BOLD}Examples:${NC}
@@ -103,6 +106,11 @@ ${BOLD}Cleanup:${NC}
   • JupyterLab exits normally
   • Ctrl+C is pressed
   • Script encounters an error
+
+  With --keep:
+  • Environments are preserved after JupyterLab exits
+  • State is saved to $TEST_ENV_DIR/.state
+  • Next invocation cleans up previous environments before creating new ones
 
 ${BOLD}Testing:${NC}
   1. Run this script to create test environments
@@ -241,6 +249,10 @@ parse_args() {
         shift
         set -- --venv --venv --no-marimo --venv --with numpy --virtualenv --virtualenv --no-marimo --conda --conda --no-marimo "$@"
         ;;
+      --keep)
+        KEEP_ENVIRONMENTS=true
+        shift
+        ;;
       --help)
         show_help
         exit 0
@@ -256,6 +268,12 @@ parse_args() {
 
 # Cleanup function - runs on exit, interrupt, or error
 cleanup() {
+  if [[ "$KEEP_ENVIRONMENTS" == true ]]; then
+    save_state
+    echo -e "\n${YELLOW}Environments kept. Run script again to clean up or use them.${NC}\n"
+    return
+  fi
+
   print_header "Cleaning up test environments"
 
   # Unregister kernels
@@ -294,6 +312,72 @@ cleanup() {
   fi
 
   echo -e "\n${GREEN}Cleanup complete!${NC}\n"
+}
+
+# Save state for --keep mode
+save_state() {
+  echo "Saving environment state for future cleanup..."
+  mkdir -p "$(dirname "$STATE_FILE")"
+  {
+    echo "TEST_ENV_DIR=$TEST_ENV_DIR"
+    echo "KERNEL_NAMES=$(IFS=,; echo "${KERNEL_NAMES[*]}")"
+    echo "CONDA_ENVS=$(IFS=,; echo "${CONDA_ENVS[*]}")"
+  } > "$STATE_FILE"
+  print_success "State saved to $STATE_FILE"
+}
+
+# Clean up previously kept environments
+cleanup_from_state() {
+  [[ ! -f "$STATE_FILE" ]] && return 0
+
+  print_header "Cleaning up previously kept environments"
+
+  # Read state file
+  local saved_test_env_dir=""
+  local saved_kernel_names=""
+  local saved_conda_envs=""
+
+  while IFS='=' read -r key value; do
+    case "$key" in
+      TEST_ENV_DIR) saved_test_env_dir="$value" ;;
+      KERNEL_NAMES) saved_kernel_names="$value" ;;
+      CONDA_ENVS) saved_conda_envs="$value" ;;
+    esac
+  done < "$STATE_FILE"
+
+  # Unregister saved kernels
+  if [[ -n "$saved_kernel_names" ]]; then
+    echo "Unregistering previously kept kernels..."
+    IFS=',' read -ra kernels <<< "$saved_kernel_names"
+    for kernel in "${kernels[@]}"; do
+      uvx jupyter kernelspec remove -y "$kernel" 2>/dev/null || true
+    done
+    print_success "Previous kernels unregistered"
+  fi
+
+  # Remove saved TEST_ENV_DIR
+  if [[ -n "$saved_test_env_dir" && -d "$saved_test_env_dir" ]]; then
+    echo "Removing previously kept environments from $saved_test_env_dir"
+    rm -rf "$saved_test_env_dir"
+    print_success "Previous environment directories removed"
+  fi
+
+  # Handle any named conda envs (not prefix-based)
+  if [[ -n "$saved_conda_envs" ]]; then
+    IFS=',' read -ra envs <<< "$saved_conda_envs"
+    for env in "${envs[@]}"; do
+      if [[ "$env" != /* ]]; then
+        # Named environment
+        if command -v mamba &> /dev/null; then
+          mamba env remove -n "$env" -y 2>/dev/null || true
+        elif command -v conda &> /dev/null; then
+          conda env remove -n "$env" -y 2>/dev/null || true
+        fi
+      fi
+    done
+  fi
+
+  print_success "Previous environments cleaned up"
 }
 
 # Set up trap for cleanup on exit, interrupt, or error
@@ -491,6 +575,9 @@ create_conda_env() {
 # Main execution
 main() {
   parse_args "$@"
+
+  # Clean up any previously kept environments first
+  cleanup_from_state
 
   local total_envs=$((${#VENV_SPECS[@]} + ${#VIRTUALENV_SPECS[@]} + ${#CONDA_SPECS[@]}))
 
