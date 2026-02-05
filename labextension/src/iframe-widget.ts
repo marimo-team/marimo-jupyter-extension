@@ -1,6 +1,20 @@
 import { MainAreaWidget, IFrame } from '@jupyterlab/apputils';
 import { UUID } from '@lumino/coreutils';
+import type { ISignal } from '@lumino/signaling';
 import { leafIcon } from './icons';
+
+/**
+ * Sandbox settings for marimo IFrames.
+ * Centralized here to ensure consistency across all IFrame creation paths.
+ */
+const IFRAME_SANDBOX_SETTINGS: IFrame.SandboxExceptions[] = [
+  'allow-same-origin',
+  'allow-scripts',
+  'allow-forms',
+  'allow-modals',
+  'allow-popups',
+  'allow-downloads',
+];
 
 /**
  * Tracked widget with metadata for session management.
@@ -11,6 +25,8 @@ interface TrackedWidget {
   widgetId: string;
   /** Whether this widget has been seen in the active sessions list at least once */
   wasConnected: boolean;
+  /** Whether this is a new notebook (not file-based) - controls title modification on disconnect */
+  isNewNotebook: boolean;
 }
 
 /**
@@ -112,8 +128,11 @@ function initializeMessageListener(): void {
         if (tracked.widgetId === widgetId) {
           // Restore the original URL to reconnect
           tracked.widget.content.url = tracked.originalUrl;
-          // Remove "(disconnected)" from title if present
-          if (tracked.widget.title.label.endsWith(' (disconnected)')) {
+          // Remove "(disconnected)" from title if present (only for new notebooks)
+          if (
+            tracked.isNewNotebook &&
+            tracked.widget.title.label.endsWith(' (disconnected)')
+          ) {
             tracked.widget.title.label = tracked.widget.title.label.replace(
               ' (disconnected)',
               '',
@@ -127,32 +146,64 @@ function initializeMessageListener(): void {
 }
 
 /**
+ * Result from createMarimoIFrame containing the IFrame and tracking metadata.
+ */
+export interface MarimoIFrameResult {
+  /** The configured IFrame ready for use */
+  iframe: IFrame;
+  /** The final URL set on the IFrame */
+  url: string;
+  /** The initialization ID for new notebooks, or null for file-based */
+  initId: string | null;
+}
+
+/**
+ * Create a marimo IFrame with proper sandbox settings and URL configuration.
+ * This is the single entry point for creating marimo IFrames - ensures
+ * consistent sandbox settings and URL building across all code paths.
+ *
+ * Note: Callers are responsible for registering the widget for tracking
+ * using registerWidgetForTracking() after wrapping in a widget.
+ */
+export function createMarimoIFrame(
+  baseUrl: string,
+  options: { filePath?: string; initId?: string } = {},
+): MarimoIFrameResult {
+  const iframe = new IFrame({
+    sandbox: IFRAME_SANDBOX_SETTINGS,
+  });
+  iframe.addClass('jp-MarimoWidget');
+
+  // Generate initId if not file-based (and not provided)
+  const initId = options.filePath
+    ? null
+    : (options.initId ?? `__new__${UUID.uuid4()}`);
+
+  // Build URL: file-based uses encoded filePath, new notebooks use initId
+  const url = options.filePath
+    ? `${baseUrl}?file=${encodeURIComponent(options.filePath)}`
+    : `${baseUrl}?file=${initId}`;
+
+  iframe.url = url;
+  return { iframe, url, initId };
+}
+
+/**
  * Create a marimo widget that embeds the editor in an iframe.
+ * Uses createMarimoIFrame internally for consistent IFrame creation.
  */
 export function createMarimoWidget(
-  url: string,
+  baseUrl: string,
   options: { filePath?: string; label?: string } = {},
 ): MainAreaWidget<IFrame> {
   const { filePath, label } = options;
 
-  const content = new IFrame({
-    sandbox: [
-      'allow-same-origin',
-      'allow-scripts',
-      'allow-forms',
-      'allow-modals',
-      'allow-popups',
-      'allow-downloads',
-    ],
-  });
-
-  // Generate initializationId for new notebooks (include __new__ prefix to match marimo API)
-  const initId = filePath ? null : `__new__${UUID.uuid4()}`;
-
-  // Build the URL with file parameter
-  const finalUrl = filePath ? url : `${url}?file=${initId}`;
-  content.url = finalUrl;
-  content.addClass('jp-MarimoWidget');
+  // Use centralized IFrame creation
+  const {
+    iframe: content,
+    url: finalUrl,
+    initId,
+  } = createMarimoIFrame(baseUrl, { filePath });
 
   const widget = new MainAreaWidget({ content });
   widget.id = `marimo-${UUID.uuid4()}`;
@@ -179,6 +230,7 @@ export function createMarimoWidget(
       originalUrl: finalUrl,
       widgetId,
       wasConnected: false,
+      isNewNotebook: true,
     });
     widget.disposed.connect(() => {
       widgetsByInitId.delete(initId);
@@ -186,17 +238,7 @@ export function createMarimoWidget(
     initializeMessageListener();
   } else if (filePath) {
     // File-based notebook - track by filePath
-    const widgetId = `marimo-widget-${UUID.uuid4()}`;
-    widgetsByFilePath.set(filePath, {
-      widget,
-      originalUrl: finalUrl,
-      widgetId,
-      wasConnected: false,
-    });
-    widget.disposed.connect(() => {
-      widgetsByFilePath.delete(filePath);
-    });
-    initializeMessageListener();
+    registerWidgetForTracking(widget, filePath, finalUrl);
   }
 
   return widget;
@@ -221,9 +263,9 @@ export function updateWidgetTitles(
       const { widget } = tracked;
       // Mark as connected now that we've seen it in the sessions list
       tracked.wasConnected = true;
-      // Remove "(disconnected)" suffix if session is back
+      // Remove "(disconnected)" suffix if session is back (only for new notebooks)
       let currentLabel = widget.title.label;
-      if (currentLabel.endsWith(' (disconnected)')) {
+      if (tracked.isNewNotebook && currentLabel.endsWith(' (disconnected)')) {
         currentLabel = currentLabel.replace(' (disconnected)', '');
         widget.title.label = currentLabel;
       }
@@ -240,13 +282,8 @@ export function updateWidgetTitles(
     const tracked = widgetsByFilePath.get(session.path);
     if (tracked) {
       tracked.wasConnected = true;
-      // Remove "(disconnected)" suffix if session is back
-      if (tracked.widget.title.label.endsWith(' (disconnected)')) {
-        tracked.widget.title.label = tracked.widget.title.label.replace(
-          ' (disconnected)',
-          '',
-        );
-      }
+      // Note: file-based widgets (isNewNotebook: false) don't add "(disconnected)"
+      // suffix, so we don't need to remove it here
     }
   }
 
@@ -271,15 +308,49 @@ export function updateWidgetTitles(
  * Show the disconnected page for a tracked widget.
  */
 function showDisconnectedPage(tracked: TrackedWidget): void {
-  const { widget, widgetId } = tracked;
+  const { widget, widgetId, isNewNotebook } = tracked;
   const disconnectedUrl = createDisconnectedPageUrl(widgetId);
 
   // Only update if not already showing disconnected page
   if (widget.content.url !== disconnectedUrl) {
     widget.content.url = disconnectedUrl;
-    // Add "(disconnected)" to title if not already present
-    if (!widget.title.label.endsWith(' (disconnected)')) {
+    // Only add "(disconnected)" suffix for new notebooks
+    // File-based notebooks shouldn't modify title (causes file rename in DocumentWidget)
+    if (isNewNotebook && !widget.title.label.endsWith(' (disconnected)')) {
       widget.title.label = `${widget.title.label} (disconnected)`;
     }
   }
+}
+
+/**
+ * Widget-like interface for registration.
+ * Allows MarimoWidgetFactory widgets to be registered for tracking.
+ */
+interface WidgetLike {
+  content: IFrame;
+  title: { label: string; caption: string };
+  disposed: ISignal<unknown, void>;
+}
+
+/**
+ * Register an externally-created widget for disconnection tracking.
+ * Used by MarimoWidgetFactory for widgets created via "Open With" menu.
+ */
+export function registerWidgetForTracking(
+  widget: WidgetLike,
+  filePath: string,
+  originalUrl: string,
+): void {
+  const widgetId = `marimo-widget-${UUID.uuid4()}`;
+  widgetsByFilePath.set(filePath, {
+    widget: widget as unknown as MainAreaWidget<IFrame>,
+    originalUrl,
+    widgetId,
+    wasConnected: false,
+    isNewNotebook: false,
+  });
+  widget.disposed.connect(() => {
+    widgetsByFilePath.delete(filePath);
+  });
+  initializeMessageListener();
 }

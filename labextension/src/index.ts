@@ -133,8 +133,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         if (!filePath) {
           return;
         }
-        const url = `${marimoBaseUrl}?file=${encodeURIComponent(filePath)}`;
-        const widget = createMarimoWidget(url, { filePath });
+        const widget = createMarimoWidget(marimoBaseUrl, { filePath });
         shell.add(widget, 'main');
         shell.activateById(widget.id);
       },
@@ -198,8 +197,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
 
           // Open the converted file in marimo
-          const url = `${marimoBaseUrl}?file=${encodeURIComponent(outputPath)}`;
-          const widget = createMarimoWidget(url, { filePath: outputPath });
+          const widget = createMarimoWidget(marimoBaseUrl, { filePath: outputPath });
           shell.add(widget, 'main');
           shell.activateById(widget.id);
         } catch (error) {
@@ -337,8 +335,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
 
           // Open the created file in marimo
-          const url = `${marimoBaseUrl}?file=${encodeURIComponent(filePath)}`;
-          const widget = createMarimoWidget(url, { filePath });
+          const widget = createMarimoWidget(marimoBaseUrl, { filePath });
           shell.add(widget, 'main');
           shell.activateById(widget.id);
         } catch {

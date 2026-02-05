@@ -3,9 +3,13 @@ import {
   type DocumentRegistry,
   DocumentWidget,
 } from '@jupyterlab/docregistry';
-import { IFrame } from '@jupyterlab/apputils';
+import type { IFrame } from '@jupyterlab/apputils';
 import { PageConfig } from '@jupyterlab/coreutils';
 import { leafIcon } from './icons';
+import {
+  createMarimoIFrame,
+  registerWidgetForTracking,
+} from './iframe-widget';
 
 /**
  * A widget that wraps a marimo IFrame for document viewing.
@@ -27,23 +31,17 @@ export class MarimoWidgetFactory extends ABCWidgetFactory<MarimoDocWidget> {
     const marimoBaseUrl = `${baseUrl}marimo/`;
     const filePath = context.path;
 
-    const content = new IFrame({
-      sandbox: [
-        'allow-same-origin',
-        'allow-scripts',
-        'allow-forms',
-        'allow-modals',
-        'allow-popups',
-        'allow-downloads',
-      ],
+    // Use centralized IFrame creation for consistent sandbox settings and URL building
+    const { iframe: content, url } = createMarimoIFrame(marimoBaseUrl, {
+      filePath,
     });
-
-    content.url = `${marimoBaseUrl}?file=${encodeURIComponent(filePath)}`;
-    content.addClass('jp-MarimoWidget');
 
     const widget = new MarimoDocWidget({ content, context });
     widget.title.icon = leafIcon;
     widget.title.caption = `marimo: ${filePath}`;
+
+    // Register for disconnection tracking
+    registerWidgetForTracking(widget, filePath, url);
 
     return widget;
   }
