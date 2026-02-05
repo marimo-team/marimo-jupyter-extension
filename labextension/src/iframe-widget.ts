@@ -42,6 +42,27 @@ const widgetsByInitId = new Map<string, TrackedWidget>();
 const widgetsByFilePath = new Map<string, TrackedWidget>();
 
 /**
+ * Get an existing widget for a file path, if one exists.
+ */
+export function getWidgetByFilePath(
+  filePath: string,
+): MainAreaWidget<IFrame> | undefined {
+  return widgetsByFilePath.get(filePath)?.widget;
+}
+
+/**
+ * Refresh a widget's iframe by resetting its URL.
+ * This forces marimo to reconnect.
+ */
+export function refreshWidgetByFilePath(filePath: string): void {
+  const tracked = widgetsByFilePath.get(filePath);
+  if (tracked) {
+    // Reset URL to force iframe reload
+    tracked.widget.content.url = tracked.originalUrl;
+  }
+}
+
+/**
  * Generate a data URL containing the disconnected page HTML.
  */
 function createDisconnectedPageUrl(widgetId: string): string {

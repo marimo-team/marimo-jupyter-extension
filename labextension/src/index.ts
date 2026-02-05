@@ -3,14 +3,23 @@ import {
   type JupyterFrontEndPlugin,
   ILayoutRestorer,
 } from '@jupyterlab/application';
-import { InputDialog, showErrorMessage } from '@jupyterlab/apputils';
+import {
+  InputDialog,
+  showErrorMessage,
+  showDialog,
+  Dialog,
+} from '@jupyterlab/apputils';
 import { ServerConnection, KernelSpecAPI } from '@jupyterlab/services';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { PageConfig } from '@jupyterlab/coreutils';
 import type { DocumentRegistry } from '@jupyterlab/docregistry';
 
-import { createMarimoWidget } from './iframe-widget';
+import {
+  createMarimoWidget,
+  getWidgetByFilePath,
+  refreshWidgetByFilePath,
+} from './iframe-widget';
 import { MarimoSidebar } from './sidebar';
 import {
   marimoIcon,
@@ -289,55 +298,138 @@ const plugin: JupyterFrontEndPlugin<void> = {
           );
           const venv = selectedKernel?.argv[0];
 
-          // Prompt for notebook name
-          const nameResult = await InputDialog.getText({
-            title: 'New marimo Notebook',
-            label: 'Notebook name:',
-            text: 'untitled.py',
-          });
-
-          if (!nameResult.button.accept || !nameResult.value) {
-            return;
-          }
-
-          let filename = nameResult.value;
-          if (!filename.endsWith('.py')) {
-            filename += '_mo.py';
-          }
-
-          // Get current directory from file browser
+          // Get current directory from file browser (needed before loop)
           const browser = fileBrowserFactory.tracker.currentWidget;
           const cwd = browser?.model.path || '';
-          const filePath = cwd ? `${cwd}/${filename}` : filename;
+          const contentsManager = app.serviceManager.contents;
 
-          // Create stub file via backend
-          const settings = ServerConnection.makeSettings();
-          const response = await ServerConnection.makeRequest(
-            `${settings.baseUrl}marimo-tools/create-stub`,
-            {
-              method: 'POST',
-              body: JSON.stringify({ path: filePath, venv }),
-            },
-            settings,
-          );
+          // Loop until valid filename or user cancels
+          let done = false;
+          while (!done) {
+            // Prompt for notebook name
+            const nameResult = await InputDialog.getText({
+              title: 'New marimo Notebook',
+              label: 'Notebook name:',
+              text: '',
+            });
 
-          const result = (await response.json()) as {
-            success: boolean;
-            error?: string;
-          };
-          if (!response.ok || !result.success) {
-            throw new Error(result.error ?? 'Failed to create notebook');
+            if (!nameResult.button.accept) {
+              return; // User clicked Cancel - exit completely
+            }
+
+            let filename = (nameResult.value ?? '').trim();
+
+            // Require non-empty filename
+            if (!filename) {
+              await showErrorMessage(
+                'Invalid Filename',
+                'Please enter a notebook name.',
+              );
+              continue; // Loop back to prompt
+            }
+
+            // Sanitize: convert spaces and hyphens to underscores
+            filename = filename.replace(/[ -]/g, '_');
+
+            // Ensure valid extension (.py or .md)
+            if (!filename.endsWith('.py') && !filename.endsWith('.md')) {
+              filename += '.py';
+            }
+
+            const filePath = cwd ? `${cwd}/${filename}` : filename;
+
+            // Check if file exists and confirm overwrite
+            let fileExists = false;
+            try {
+              await contentsManager.get(filePath, { content: false });
+              fileExists = true;
+            } catch {
+              // File doesn't exist - good to proceed
+            }
+
+            // Check for existing widget before overwrite logic
+            const existingWidget = fileExists
+              ? getWidgetByFilePath(filePath)
+              : null;
+
+            if (fileExists) {
+              const confirmResult = await showDialog({
+                title: 'File Exists',
+                body: `"${filename}" already exists. Overwrite?`,
+                buttons: [
+                  Dialog.cancelButton(),
+                  Dialog.warnButton({ label: 'Overwrite' }),
+                ],
+              });
+              if (!confirmResult.button.accept) {
+                continue; // User declined - loop back to rename
+              }
+
+              // Shutdown existing session if there's an open tab
+              if (existingWidget) {
+                try {
+                  const sessionsResponse = await fetch(
+                    `${marimoBaseUrl}api/home/running_notebooks`,
+                    { method: 'POST', credentials: 'same-origin' },
+                  );
+                  if (sessionsResponse.ok) {
+                    const data = (await sessionsResponse.json()) as {
+                      files?: { sessionId: string; path: string }[];
+                    };
+                    const session = data.files?.find((s) => s.path === filePath);
+                    if (session) {
+                      await fetch(`${marimoBaseUrl}api/home/shutdown_session`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: session.sessionId }),
+                      });
+                    }
+                  }
+                } catch {
+                  // Continue even if shutdown fails
+                }
+              }
+            }
+
+            // Create stub file via backend
+            const settings = ServerConnection.makeSettings();
+            const response = await ServerConnection.makeRequest(
+              `${settings.baseUrl}marimo-tools/create-stub`,
+              {
+                method: 'POST',
+                body: JSON.stringify({ path: filePath, venv }),
+              },
+              settings,
+            );
+
+            const result = (await response.json()) as {
+              success: boolean;
+              error?: string;
+            };
+            if (!response.ok || !result.success) {
+              throw new Error(result.error ?? 'Failed to create notebook');
+            }
+
+            // Refresh file browser
+            if (browser) {
+              await browser.model.refresh();
+            }
+
+            // If we had an existing widget, refresh it instead of creating new
+            if (existingWidget) {
+              refreshWidgetByFilePath(filePath);
+              shell.activateById(existingWidget.id);
+              done = true;
+              continue;
+            }
+
+            // Open the created file in marimo
+            const widget = createMarimoWidget(marimoBaseUrl, { filePath });
+            shell.add(widget, 'main');
+            shell.activateById(widget.id);
+            done = true;
           }
-
-          // Refresh file browser
-          if (browser) {
-            await browser.model.refresh();
-          }
-
-          // Open the created file in marimo
-          const widget = createMarimoWidget(marimoBaseUrl, { filePath });
-          shell.add(widget, 'main');
-          shell.activateById(widget.id);
         } catch {
           // Fall back to opening marimo directly on any error
           const widget = createMarimoWidget(marimoBaseUrl, {
