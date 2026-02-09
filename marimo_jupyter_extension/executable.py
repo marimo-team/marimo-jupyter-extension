@@ -29,7 +29,7 @@ def get_marimo_command(config: Config) -> list[str]:
     """
     # uvx mode (opt-in via explicit uvx_path)
     if config.uvx_path:
-        return [config.uvx_path, "marimo[sandbox]>=0.19.8"]
+        return [config.uvx_path, "marimo[sandbox]>=0.19.9"]
 
     # Explicit marimo path
     if config.marimo_path:

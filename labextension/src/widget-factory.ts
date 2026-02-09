@@ -1,10 +1,10 @@
+import type { IFrame } from '@jupyterlab/apputils';
+import { PageConfig } from '@jupyterlab/coreutils';
 import {
   ABCWidgetFactory,
   type DocumentRegistry,
   DocumentWidget,
 } from '@jupyterlab/docregistry';
-import type { IFrame } from '@jupyterlab/apputils';
-import { PageConfig } from '@jupyterlab/coreutils';
 import { leafIcon } from './icons';
 import {
   createMarimoIFrame,
