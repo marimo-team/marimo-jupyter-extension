@@ -1,6 +1,6 @@
-import { Widget } from '@lumino/widgets';
-import type { CommandRegistry } from '@lumino/commands';
 import { PageConfig } from '@jupyterlab/coreutils';
+import type { CommandRegistry } from '@lumino/commands';
+import { Widget } from '@lumino/widgets';
 import { marimoIcon } from './icons';
 import { updateWidgetTitles } from './iframe-widget';
 

@@ -1,33 +1,35 @@
 import {
+  ILayoutRestorer,
   type JupyterFrontEnd,
   type JupyterFrontEndPlugin,
-  ILayoutRestorer,
 } from '@jupyterlab/application';
 import {
-  InputDialog,
-  showErrorMessage,
-  showDialog,
   Dialog,
+  InputDialog,
+  Notification,
+  showDialog,
+  showErrorMessage,
 } from '@jupyterlab/apputils';
-import { ServerConnection, KernelSpecAPI } from '@jupyterlab/services';
-import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
-import { ILauncher } from '@jupyterlab/launcher';
 import { PageConfig } from '@jupyterlab/coreutils';
 import type { DocumentRegistry } from '@jupyterlab/docregistry';
+import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
+import { ILauncher } from '@jupyterlab/launcher';
+import { KernelSpecAPI, ServerConnection } from '@jupyterlab/services';
 
+import { runIcon } from '@jupyterlab/ui-components';
+import {
+  leafIconUrl,
+  marimoFileIcon,
+  marimoIcon,
+  marimoIconUrl,
+} from './icons';
 import {
   createMarimoWidget,
   getWidgetByFilePath,
   refreshWidgetByFilePath,
 } from './iframe-widget';
 import { MarimoSidebar } from './sidebar';
-import {
-  marimoIcon,
-  marimoFileIcon,
-  marimoIconUrl,
-  leafIconUrl,
-} from './icons';
-import { MarimoWidgetFactory, FACTORY_NAME } from './widget-factory';
+import { FACTORY_NAME, MarimoWidgetFactory } from './widget-factory';
 
 import '../style/base.css';
 
@@ -39,6 +41,7 @@ const CommandIDs = {
   convertNotebook: 'marimo:convert-notebook',
   newNotebook: 'marimo:new-notebook',
   openEditor: 'marimo:open-editor',
+  copyAppLink: 'marimo:copy-app-link',
 } as const;
 
 /**
@@ -132,7 +135,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     commands.addCommand(CommandIDs.openFile, {
       label: 'Edit with marimo',
       caption: 'Edit this Python file in the marimo editor',
-      icon: marimoIcon,
+      icon: marimoFileIcon,
       isVisible: () => {
         const path = getSelectedFilePath(fileBrowserFactory);
         return path !== null && (isPythonFile(path) || isMarimoFile(path));
@@ -460,7 +463,54 @@ const plugin: JupyterFrontEndPlugin<void> = {
       },
     });
 
+    // Command: Copy app link for sharing
+    commands.addCommand(CommandIDs.copyAppLink, {
+      label: 'Copy App Link',
+      caption: 'Copy a shareable link to run this notebook as an app',
+      icon: runIcon,
+      isVisible: () => {
+        const path = getSelectedFilePath(fileBrowserFactory);
+        return path !== null && isPythonFile(path);
+      },
+      execute: async () => {
+        const filePath = getSelectedFilePath(fileBrowserFactory);
+        if (!filePath) {
+          return;
+        }
+
+        // Extract proxy name from marimoBaseUrl (e.g., '/user/foo/marimo/' → 'marimo')
+        const proxyName =
+          marimoBaseUrl.split('/').filter(Boolean).pop() || 'marimo';
+
+        // Detect JupyterHub vs standalone JupyterLab
+        const hubPrefix = PageConfig.getOption('hubPrefix');
+        let appUrl: string;
+
+        if (hubPrefix) {
+          // JupyterHub: use /user-redirect/ for cross-user sharing
+          appUrl = `${window.location.origin}${hubPrefix}user-redirect/${proxyName}/?file=${encodeURIComponent(filePath)}&show-chrome=false&view-as=present`;
+        } else {
+          // Standalone JupyterLab: use marimo base URL directly
+          // marimoBaseUrl may be absolute (http://...) or relative (/marimo/)
+          const baseUrl = marimoBaseUrl.startsWith('http')
+            ? marimoBaseUrl
+            : `${window.location.origin}${marimoBaseUrl}`;
+          appUrl = `${baseUrl}?file=${encodeURIComponent(filePath)}&show-chrome=false&view-as=present`;
+        }
+
+        await navigator.clipboard.writeText(appUrl);
+        Notification.success('App link copied to clipboard');
+      },
+    });
+
     // Add context menu items programmatically for proper visibility support
+    // Separator before marimo edit section
+    app.contextMenu.addItem({
+      type: 'separator',
+      selector: '.jp-DirListing-item[data-isdir="false"]',
+      rank: 49.5,
+    });
+
     app.contextMenu.addItem({
       command: CommandIDs.openFile,
       selector: '.jp-DirListing-item[data-isdir="false"]',
@@ -471,6 +521,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
       command: CommandIDs.convertNotebook,
       selector: '.jp-DirListing-item[data-isdir="false"]',
       rank: 51,
+    });
+
+    // Separator for marimo section
+    app.contextMenu.addItem({
+      command: CommandIDs.copyAppLink,
+      selector: '.jp-DirListing-item[data-isdir="false"]',
+      rank: 49,
     });
 
     // Add to launcher if available

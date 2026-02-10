@@ -1,4 +1,4 @@
-import { MainAreaWidget, IFrame } from '@jupyterlab/apputils';
+import { IFrame, MainAreaWidget } from '@jupyterlab/apputils';
 import { UUID } from '@lumino/coreutils';
 import type { ISignal } from '@lumino/signaling';
 import { leafIcon } from './icons';

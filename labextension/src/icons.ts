@@ -1,6 +1,6 @@
 import { LabIcon } from '@jupyterlab/ui-components';
-import marimoIconSvg from '../style/marimo.svg';
 import marimoFileIconSvg from '../style/marimo-file-icon.svg';
+import marimoIconSvg from '../style/marimo.svg';
 
 export const marimoIcon = new LabIcon({
   name: '@marimo-team/jupyter-extension:marimo',
