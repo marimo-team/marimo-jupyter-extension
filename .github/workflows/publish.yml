@@ -64,3 +64,11 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Notify release result
+        if: always()
+        uses: marimo-team/internal-gh-actions/release-notification@main
+        with:
+          status: ${{ job.status }}
+          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL_RELEASES }}
+          artifact-url: "https://pypi.org/project/marimo-jupyter-extension/"
