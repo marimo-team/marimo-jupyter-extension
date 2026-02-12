@@ -30,7 +30,7 @@
 ## Quick Start
 
 ```bash
-uv pip install 'marimo[sandbox]>=0.19.8' marimo-jupyter-extension
+uv pip install 'marimo[sandbox]>=0.19.11' marimo-jupyter-extension
 ```
 
 Launch JupyterLab and click the marimo icon in the launcher, or use the sidebar panel.
@@ -70,7 +70,7 @@ See [Installation Guide](https://marimo-team.github.io/marimo-jupyter-extension/
 ### Single Environment
 
 ```bash
-uv pip install 'marimo[sandbox]>=0.19.8' marimo-jupyter-extension
+uv pip install 'marimo[sandbox]>=0.19.11' marimo-jupyter-extension
 ```
 
 ### Multiple Environments (JupyterHub)
@@ -128,7 +128,7 @@ See [Troubleshooting Guide](https://marimo-team.github.io/marimo-jupyter-extensi
 | marimo icon missing | Install `marimo-jupyter-extension` in Jupyter's environment |
 | marimo fails to launch | Ensure marimo is in PATH or configure `MarimoProxyConfig.marimo_path` |
 | Modules not found | Install marimo in the same environment as your packages |
-| Sandbox features not working | Upgrade to `marimo[sandbox]>=0.19.8` |
+| Sandbox features not working | Upgrade to `marimo[sandbox]>=0.19.11` |
 
 ## Community
 

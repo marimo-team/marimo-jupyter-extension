@@ -136,7 +136,7 @@ class CreateStubHandler(JupyterHandler):
             [
                 "import marimo",
                 "",
-                '__generated_with = "0.19.8"',
+                '__generated_with = "0.19.11"',
                 'app = marimo.App(width="medium")',
                 "",
                 "",
