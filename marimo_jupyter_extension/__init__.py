@@ -11,7 +11,7 @@ import secrets
 from .config import get_config
 from .executable import get_marimo_command
 
-__version__ = "0.1.3"
+__version__ = "0.1.2"
 __all__ = ["setup_marimoserver"]
 
 
