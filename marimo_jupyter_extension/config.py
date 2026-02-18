@@ -67,7 +67,7 @@ class Config:
     uvx_path: str | None  # If set, use uvx mode
     timeout: int
     base_url: str
-    no_sandbox: bool  # Keep sandbox as default
+    no_sandbox: bool = False  # Keep sandbox as default
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:

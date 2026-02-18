@@ -45,6 +45,14 @@ class TestMarimoProxyConfig:
 
         assert config.uvx_path == "/custom/path/uvx"
 
+    def test_default_no_sandbox_is_false(self, clean_env):
+        """Default no_sandbox should be False."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        assert config.no_sandbox is False
+
 
 class TestGetConfig:
     """Test suite for get_config() function."""
@@ -67,6 +75,7 @@ class TestGetConfig:
         assert hasattr(result, "uvx_path")
         assert hasattr(result, "timeout")
         assert hasattr(result, "base_url")
+        assert hasattr(result, "no_sandbox")
 
     def test_base_url_with_prefix(self, clean_env, mock_marimo_in_path):
         """base_url should use JUPYTERHUB_SERVICE_PREFIX."""
@@ -101,6 +110,32 @@ class TestGetConfig:
 
         assert result.marimo_path == "/traitlets/marimo"
         assert result.timeout == 90
+
+    def test_no_sandbox_default_is_false(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """no_sandbox should default to False in get_config result."""
+        from marimo_jupyter_extension.config import get_config
+
+        result = get_config()
+
+        assert result.no_sandbox is False
+
+    def test_no_sandbox_applied_from_traitlets(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """no_sandbox should be applied from traitlets config."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.no_sandbox = True
+
+        result = get_config(traitlets_config)
+
+        assert result.no_sandbox is True
 
 
 class TestConfigDataclass:
