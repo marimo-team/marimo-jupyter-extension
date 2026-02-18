@@ -111,9 +111,7 @@ class TestGetConfig:
         assert result.marimo_path == "/traitlets/marimo"
         assert result.timeout == 90
 
-    def test_no_sandbox_default_is_false(
-        self, clean_env, mock_marimo_in_path
-    ):
+    def test_no_sandbox_default_is_false(self, clean_env, mock_marimo_in_path):
         """no_sandbox should default to False in get_config result."""
         from marimo_jupyter_extension.config import get_config
 

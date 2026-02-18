@@ -40,7 +40,7 @@ class MarimoProxyConfig(Configurable):
     no_sandbox = Bool(
         default_value=False,
         allow_none=True,
-        help="Do not run Marimo with sandboxing"
+        help="Do not run Marimo with sandboxing",
     ).tag(config=True)
 
     @default("marimo_path")
@@ -90,7 +90,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         uvx_path=cfg.uvx_path,
         timeout=cfg.timeout,
         base_url=_get_base_url(),
-        no_sandbox=bool(cfg.no_sandbox)
+        no_sandbox=bool(cfg.no_sandbox),
     )
 
 
