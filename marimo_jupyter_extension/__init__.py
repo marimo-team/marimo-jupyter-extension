@@ -31,7 +31,7 @@ def setup_marimoserver():
         "command": [
             *marimo_cmd,
             "edit",
-            "--sandbox",
+            *([] if config.no_sandbox else ["--sandbox"]),
             "--port",
             "{port}",
             "--base-url",

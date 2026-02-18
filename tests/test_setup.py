@@ -74,6 +74,42 @@ class TestSetupMarimoserver:
         assert "enabled" in result["launcher_entry"]
         assert result["launcher_entry"]["enabled"] is False
 
+    def test_command_includes_sandbox_by_default(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """Command should include --sandbox when no_sandbox is False."""
+        from marimo_jupyter_extension import setup_marimoserver
+
+        result = setup_marimoserver()
+
+        assert "--sandbox" in result["command"]
+
+    def test_command_excludes_sandbox_when_no_sandbox(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """Command should omit --sandbox when no_sandbox is True."""
+        from unittest.mock import patch
+
+        from marimo_jupyter_extension.config import Config
+
+        mock_config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            no_sandbox=True,
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_config",
+            return_value=mock_config,
+        ):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            result = setup_marimoserver()
+
+        assert "--sandbox" not in result["command"]
+
 
 class TestTokenAuthentication:
     """Test suite for token-based authentication."""

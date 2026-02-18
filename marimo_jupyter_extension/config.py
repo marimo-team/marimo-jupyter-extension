@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from traitlets import Int, Unicode, default
+from traitlets import Bool, Int, Unicode, default
 from traitlets.config import Configurable
 
 DEFAULT_TIMEOUT = 60
@@ -37,6 +37,12 @@ class MarimoProxyConfig(Configurable):
         help="Timeout in seconds for marimo to start.",
     ).tag(config=True)
 
+    no_sandbox = Bool(
+        default_value=False,
+        allow_none=True,
+        help="Do not run Marimo with sandboxing",
+    ).tag(config=True)
+
     @default("marimo_path")
     def _default_marimo_path(self):
         return None
@@ -61,18 +67,30 @@ class Config:
     uvx_path: str | None  # If set, use uvx mode
     timeout: int
     base_url: str
+    no_sandbox: bool = False  # Keep sandbox as default
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
     """Load configuration from Traitlets or defaults."""
-    # Use traitlets config if provided, otherwise create default
-    cfg = traitlets_config or MarimoProxyConfig()
+    if traitlets_config is not None:
+        cfg = traitlets_config
+    else:
+        # Try to get config from the running ServerApp so that settings
+        # from jupyter_notebook_config / jupyterhub_config are respected.
+        try:
+            from jupyter_server.serverapp import ServerApp
+
+            app = ServerApp.instance()
+            cfg = MarimoProxyConfig(config=app.config)
+        except Exception:
+            cfg = MarimoProxyConfig()
 
     return Config(
         marimo_path=cfg.marimo_path,
         uvx_path=cfg.uvx_path,
         timeout=cfg.timeout,
         base_url=_get_base_url(),
+        no_sandbox=bool(cfg.no_sandbox),
     )
 
 
