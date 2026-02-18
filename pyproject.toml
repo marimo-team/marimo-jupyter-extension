@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "marimo-jupyter-extension"
-version = "0.1.2"
+version = "0.1.3"
 description = "Jupyter extension to proxy marimo with JupyterLab integration"
 readme = "README.md"
 license = "Apache-2.0"
