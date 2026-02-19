@@ -229,6 +229,35 @@ const plugin: JupyterFrontEndPlugin<void> = {
       caption: 'Create a new marimo notebook',
       execute: async () => {
         try {
+          // Check if sandbox is disabled (venv selection requires --sandbox)
+          const settings = ServerConnection.makeSettings();
+          let noSandbox = false;
+          try {
+            const configResponse = await ServerConnection.makeRequest(
+              `${settings.baseUrl}marimo-tools/config`,
+              { method: 'GET' },
+              settings,
+            );
+            if (configResponse.ok) {
+              const configData = (await configResponse.json()) as {
+                no_sandbox: boolean;
+              };
+              noSandbox = configData.no_sandbox;
+            }
+          } catch {
+            // If config fetch fails, assume sandbox enabled (default)
+          }
+
+          // If sandbox is disabled, skip venv picker (venv selection won't work)
+          if (noSandbox) {
+            const widget = createMarimoWidget(marimoBaseUrl, {
+              label: 'New Notebook',
+            });
+            shell.add(widget, 'main');
+            shell.activateById(widget.id);
+            return;
+          }
+
           // Fetch available kernel specs
           const specs = await KernelSpecAPI.getSpecs();
 

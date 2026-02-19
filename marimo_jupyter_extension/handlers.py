@@ -92,6 +92,22 @@ class RestartHandler(JupyterHandler):
             self.finish({"success": False, "error": str(e)})
 
 
+class ConfigHandler(JupyterHandler):
+    """Handler for exposing extension configuration to the frontend."""
+
+    @web.authenticated
+    async def get(self):
+        """Return extension configuration.
+
+        GET /marimo-tools/config
+        Response: {"no_sandbox": bool}
+        """
+        from .config import get_config
+
+        config = get_config()
+        self.finish({"no_sandbox": config.no_sandbox})
+
+
 class CreateStubHandler(JupyterHandler):
     """Handler for creating marimo notebook stub files."""
 
@@ -174,6 +190,7 @@ def _load_jupyter_server_extension(server_app):
                 url_path_join(base_url, "marimo-tools/create-stub"),
                 CreateStubHandler,
             ),
+            (url_path_join(base_url, "marimo-tools/config"), ConfigHandler),
         ],
     )
     server_app.log.info("marimo-jupyter-extension tools extension loaded")

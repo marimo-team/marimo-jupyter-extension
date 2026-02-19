@@ -40,7 +40,7 @@ class MarimoProxyConfig(Configurable):
     no_sandbox = Bool(
         default_value=False,
         allow_none=True,
-        help="Do not run Marimo with sandboxing",
+        help="Start marimo without sandboxing",
     ).tag(config=True)
 
     @default("marimo_path")
