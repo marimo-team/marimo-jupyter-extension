@@ -32,6 +32,7 @@ BOLD='\033[1m'
 TEST_ENV_DIR=".test-envs"
 STATE_FILE="$TEST_ENV_DIR/.state"
 KEEP_ENVIRONMENTS=false
+NO_SANDBOX=false
 CONDA_ENVS_DIR="$TEST_ENV_DIR/conda-envs"
 CONDA_PKGS_DIR="$TEST_ENV_DIR/conda-pkgs"
 
@@ -80,6 +81,7 @@ ${BOLD}Options:${NC}
   --no-marimo     Don't install marimo in the preceding environment
   --with PKG      Install PKG in the preceding environment (can be repeated)
   --sink          Kitchen sink: 7 envs (venv/virtualenv/conda x marimo/no-marimo + venv-numpy)
+  --no-sandbox    Launch with no_sandbox=True (disables --sandbox and venv picker)
   --keep          Don't clean up environments when JupyterLab exits
   --help          Show this help message
 
@@ -248,6 +250,10 @@ parse_args() {
         # Creates 7 envs: venv, venv-no-marimo, venv-numpy, virtualenv, virtualenv-no-marimo, conda, conda-no-marimo
         shift
         set -- --venv --venv --no-marimo --venv --with numpy --virtualenv --virtualenv --no-marimo --conda --conda --no-marimo "$@"
+        ;;
+      --no-sandbox)
+        NO_SANDBOX=true
+        shift
         ;;
       --keep)
         KEEP_ENVIRONMENTS=true
@@ -658,8 +664,21 @@ main() {
 
   # Re-build
   uv pip install -e .
+
+  # Generate config if --no-sandbox
+  local jupyter_args=()
+  if [[ "$NO_SANDBOX" == true ]]; then
+    local config_file="$TEST_ENV_DIR/jupyter_config.py"
+    mkdir -p "$TEST_ENV_DIR"
+    cat > "$config_file" << 'PYEOF'
+c.MarimoProxyConfig.no_sandbox = True
+PYEOF
+    jupyter_args+=(--config "$config_file")
+    print_warning "Launching with no_sandbox=True (venv picker disabled)"
+  fi
+
   # Launch JupyterLab using uv
-  uv run jupyter lab
+  uv run jupyter lab "${jupyter_args[@]}"
 }
 
 main "$@"
