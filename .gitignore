@@ -185,3 +185,5 @@ tsconfig.tsbuildinfo
 
 # JupyterLab extension build output
 marimo_jupyter_extension/labextension/
+
+.claude/
