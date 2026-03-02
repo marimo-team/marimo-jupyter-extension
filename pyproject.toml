@@ -8,9 +8,9 @@ version = "0.1.3"
 description = "Jupyter extension to proxy marimo with JupyterLab integration"
 readme = "README.md"
 license = "Apache-2.0"
+# forked from "Jiang Yio"; thank you for getting this started !
 authors = [
     { name = "Marimo Team" },
-    { name = "Jiang Yio" },   # Original Author; thank you !
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -33,7 +33,9 @@ dependencies = [
     "traitlets>=5.0",
     "uv>=0.4",
     "nbconvert>=7.0",
-    "pyzmq>=27.1.0",  # if marimo is provided, we additionally need this.
+    # pyzmq, is unpinned to prevent collision
+    # (follows vscode precedent)
+    "pyzmq",
 ]
 
 [project.optional-dependencies]
