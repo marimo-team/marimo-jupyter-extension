@@ -20,5 +20,6 @@
     "strictNullChecks": true,
     "target": "ES2021"
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts"]
 }

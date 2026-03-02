@@ -18,6 +18,12 @@ import { KernelSpecAPI, ServerConnection } from '@jupyterlab/services';
 
 import { runIcon } from '@jupyterlab/ui-components';
 import {
+  isPythonFile,
+  isNotebookFile,
+  isMarimoFile,
+  marimoFileType,
+} from './file-types';
+import {
   leafIconUrl,
   marimoFileIcon,
   marimoIcon,
@@ -70,45 +76,6 @@ function getSelectedFilePath(
 
   return item.value.path;
 }
-
-/**
- * Check if a file path is a Python file.
- */
-function isPythonFile(path: string): boolean {
-  return path.endsWith('.py');
-}
-
-/**
- * Check if a file path is a Jupyter notebook.
- */
-function isNotebookFile(path: string): boolean {
-  return path.endsWith('.ipynb');
-}
-
-/**
- * Check if a file path is a Marimo notebook (_mo.py).
- */
-function isMarimoFile(path: string): boolean {
-  return path.endsWith('_mo.py');
-}
-
-/**
- * The Marimo file type for _mo.py files.
- * Note: We use `pattern` instead of relying solely on `extensions` because
- * JupyterLab's extname() extracts everything after the first dot, so for
- * `script_mo.py` it extracts `.py`, not `_mo.py`. The pattern regex handles
- * the `_mo` suffix correctly.
- */
-const marimoFileType: Partial<DocumentRegistry.IFileType> = {
-  name: 'marimo',
-  displayName: 'Marimo Notebook',
-  mimeTypes: ['text/x-python'],
-  extensions: ['.py'],
-  pattern: '.*_mo\\.py$',
-  fileFormat: 'text',
-  contentType: 'file',
-  icon: marimoFileIcon,
-};
 
 /**
  * The main plugin that provides marimo integration.

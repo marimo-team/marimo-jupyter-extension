@@ -40,6 +40,8 @@
     "lint:check": "biome lint --config-path .. --diagnostic-level=warn . && eslint src",
     "format": "biome format --config-path .. --write .",
     "format:check": "biome format --config-path .. .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -67,7 +69,8 @@
     "npm-run-all": "^4.1.5",
     "npm-run-all2": "^6.2.0",
     "rimraf": "^5.0.0",
-    "typescript": "~5.3.0"
+    "typescript": "~5.3.0",
+    "vitest": "^3.0.0"
   },
   "jupyterlab": {
     "extension": true,

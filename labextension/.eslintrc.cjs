@@ -67,5 +67,5 @@ module.exports = {
     '@typescript-eslint/no-floating-promises': 'off', // JupyterLab async patterns
     '@typescript-eslint/no-misused-promises': 'off', // JupyterLab async patterns
   },
-  ignorePatterns: ['lib/**', 'node_modules/**', '*.js', '*.cjs'],
+  ignorePatterns: ['lib/**', 'node_modules/**', '*.js', '*.cjs', '*.test.ts'],
 };
