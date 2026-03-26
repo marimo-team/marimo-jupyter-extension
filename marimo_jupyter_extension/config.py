@@ -43,6 +43,11 @@ class MarimoProxyConfig(Configurable):
         help="Start marimo without sandboxing",
     ).tag(config=True)
 
+    host = Unicode(
+        "::",
+        help="Host for marimo to bind to. Defaults to :: (all interfaces, IPv4 and IPv6).",
+    ).tag(config=True)
+
     @default("marimo_path")
     def _default_marimo_path(self):
         return None
@@ -68,6 +73,7 @@ class Config:
     timeout: int
     base_url: str
     no_sandbox: bool = False  # Keep sandbox as default
+    host: str = "::"  # Bind host; :: covers both IPv4 and IPv6
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
@@ -91,6 +97,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         timeout=cfg.timeout,
         base_url=_get_base_url(),
         no_sandbox=bool(cfg.no_sandbox),
+        host=cfg.host,
     )
 
 

@@ -34,6 +34,8 @@ def setup_marimoserver():
             *([] if config.no_sandbox else ["--sandbox"]),
             "--port",
             "{port}",
+            "--host",
+            config.host,
             "--base-url",
             config.base_url,
             "--token",
