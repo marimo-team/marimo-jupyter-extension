@@ -1,8 +1,61 @@
 """Tests for configuration (config.py)."""
 
 import os
+import socket
+from unittest.mock import patch
 
 import pytest
+
+_IPV6_ADDRINFO = [
+    (socket.AF_INET6, socket.SOCK_STREAM, 0, "", ("::1", 0, 0, 0))
+]
+_IPV4_ADDRINFO = [
+    (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("127.0.0.1", 0))
+]
+
+
+class TestDetectLocalhostHost:
+    """Tests for _detect_localhost_host()."""
+
+    def test_returns_ipv6_loopback_when_ipv6_preferred(self):
+        """Should return '::1' when localhost resolves to IPv6 first."""
+        from marimo_jupyter_extension.config import _detect_localhost_host
+
+        with patch(
+            "marimo_jupyter_extension.config.socket.getaddrinfo",
+            return_value=_IPV6_ADDRINFO,
+        ):
+            assert _detect_localhost_host() == "::1"
+
+    def test_returns_none_when_ipv4_preferred(self):
+        """Should return None when localhost resolves to IPv4 first."""
+        from marimo_jupyter_extension.config import _detect_localhost_host
+
+        with patch(
+            "marimo_jupyter_extension.config.socket.getaddrinfo",
+            return_value=_IPV4_ADDRINFO,
+        ):
+            assert _detect_localhost_host() is None
+
+    def test_returns_none_on_gaierror(self):
+        """Should return None when getaddrinfo raises gaierror."""
+        from marimo_jupyter_extension.config import _detect_localhost_host
+
+        with patch(
+            "marimo_jupyter_extension.config.socket.getaddrinfo",
+            side_effect=socket.gaierror("lookup failed"),
+        ):
+            assert _detect_localhost_host() is None
+
+    def test_returns_none_on_empty_results(self):
+        """Should return None when getaddrinfo returns empty list."""
+        from marimo_jupyter_extension.config import _detect_localhost_host
+
+        with patch(
+            "marimo_jupyter_extension.config.socket.getaddrinfo",
+            return_value=[],
+        ):
+            assert _detect_localhost_host() is None
 
 
 class TestMarimoProxyConfig:
@@ -134,6 +187,46 @@ class TestGetConfig:
         result = get_config(traitlets_config)
 
         assert result.no_sandbox is True
+
+    def test_host_auto_detected_as_ipv6(self, clean_env, mock_marimo_in_path):
+        """host should be '::1' when localhost resolves to IPv6 first."""
+        from marimo_jupyter_extension.config import get_config
+
+        with patch(
+            "marimo_jupyter_extension.config.socket.getaddrinfo",
+            return_value=_IPV6_ADDRINFO,
+        ):
+            result = get_config()
+
+        assert result.host == "::1"
+
+    def test_host_auto_detected_as_none_for_ipv4(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """host should be None when localhost resolves to IPv4 first."""
+        from marimo_jupyter_extension.config import get_config
+
+        with patch(
+            "marimo_jupyter_extension.config.socket.getaddrinfo",
+            return_value=_IPV4_ADDRINFO,
+        ):
+            result = get_config()
+
+        assert result.host is None
+
+    def test_host_override_via_traitlets(self, clean_env, mock_marimo_in_path):
+        """Explicit host traitlet should override auto-detection."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.host = "0.0.0.0"
+
+        result = get_config(traitlets_config)
+
+        assert result.host == "0.0.0.0"
 
 
 class TestConfigDataclass:
