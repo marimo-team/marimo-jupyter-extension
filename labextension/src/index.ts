@@ -113,7 +113,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
           label: 'Notebook name:',
           text: '',
         });
-        if (!nameResult.button.accept) return;
+        if (!nameResult.button.accept) {
+          return;
+        }
 
         let filename = (nameResult.value ?? '').trim();
         if (!filename) {
@@ -152,7 +154,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
               Dialog.warnButton({ label: 'Overwrite' }),
             ],
           });
-          if (!confirmResult.button.accept) continue;
+          if (!confirmResult.button.accept) {
+            continue;
+          }
 
           if (existingWidget) {
             try {
@@ -194,7 +198,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
           throw new Error(result.error ?? 'Failed to create notebook');
         }
 
-        if (browser) await browser.model.refresh();
+        if (browser) {
+          await browser.model.refresh();
+        }
 
         if (existingWidget) {
           refreshWidgetByFilePath(filePath);
@@ -478,12 +484,18 @@ const plugin: JupyterFrontEndPlugin<void> = {
             }[] = [];
             if (specs?.kernelspecs) {
               for (const [name, spec] of Object.entries(specs.kernelspecs)) {
-                if (!spec) continue;
+                if (!spec) {
+                  continue;
+                }
                 const argv = spec.argv ?? [];
                 if (argv.length > 0) {
                   const pythonPath = argv[0];
-                  if (!pythonPath.includes('/') && !pythonPath.includes('\\'))
+                  if (
+                    !pythonPath.includes('/') &&
+                    !pythonPath.includes('\\')
+                  ) {
                     continue;
+                  }
                   kernelEntries.push({
                     name,
                     displayName: spec.display_name ?? name,
@@ -504,8 +516,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
                 items,
                 current: 0,
               });
-              if (!kernelResult.button.accept || kernelResult.value === null)
+              if (!kernelResult.button.accept || kernelResult.value === null) {
                 return;
+              }
               if (kernelResult.value !== 'Default (no venv)') {
                 const selectedKernel = kernelEntries.find(
                   (k) => k.displayName === kernelResult.value,
