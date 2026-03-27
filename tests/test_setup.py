@@ -1,6 +1,7 @@
 """Tests for the setup_marimoserver() function."""
 
 import os
+from unittest.mock import patch
 
 
 class TestSetupMarimoserver:
@@ -186,3 +187,55 @@ class TestAbsoluteUrl:
         command = " ".join(result["command"])
 
         assert "/marimo" in command
+
+
+class TestHostFlag:
+    """Tests for --host flag behavior in setup_marimoserver()."""
+
+    def test_host_flag_included_when_ipv6(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """--host ::1 should appear in command when IPv6 is detected."""
+        from marimo_jupyter_extension.config import Config
+
+        mock_config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            host="::1",
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_config",
+            return_value=mock_config,
+        ):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            result = setup_marimoserver()
+
+        cmd = result["command"]
+        assert "--host" in cmd
+        assert cmd[cmd.index("--host") + 1] == "::1"
+
+    def test_host_flag_omitted_when_none(self, clean_env, mock_marimo_in_path):
+        """--host should not appear in command when host is None."""
+        from marimo_jupyter_extension.config import Config
+
+        mock_config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            host=None,
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_config",
+            return_value=mock_config,
+        ):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            result = setup_marimoserver()
+
+        assert "--host" not in result["command"]

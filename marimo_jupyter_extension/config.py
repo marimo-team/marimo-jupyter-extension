@@ -1,6 +1,7 @@
 """Configuration for marimo-jupyter-extension."""
 
 import os
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,6 +9,22 @@ from traitlets import Bool, Int, Unicode, default
 from traitlets.config import Configurable
 
 DEFAULT_TIMEOUT = 60
+
+
+def _detect_localhost_host() -> str | None:
+    """Return '::1' if localhost resolves to IPv6 first, else None.
+
+    When None, the --host flag is omitted and marimo uses its own default
+    (127.0.0.1). When '::1', marimo binds to the IPv6 loopback to match
+    how jupyter-server-proxy resolves localhost on IPv6-first systems.
+    """
+    try:
+        results = socket.getaddrinfo("localhost", None)
+        if results and results[0][0] == socket.AF_INET6:
+            return "::1"
+    except socket.gaierror:
+        pass
+    return None
 
 
 class MarimoProxyConfig(Configurable):
@@ -43,6 +60,18 @@ class MarimoProxyConfig(Configurable):
         help="Start marimo without sandboxing",
     ).tag(config=True)
 
+    host = Unicode(
+        allow_none=True,
+        help=(
+            "Host for marimo to bind to. Auto-detected from localhost "
+            "resolution if not set; override to force a specific address."
+        ),
+    ).tag(config=True)
+
+    @default("host")
+    def _default_host(self):
+        return _detect_localhost_host()
+
     @default("marimo_path")
     def _default_marimo_path(self):
         return None
@@ -68,6 +97,9 @@ class Config:
     timeout: int
     base_url: str
     no_sandbox: bool = False  # Keep sandbox as default
+    host: str | None = (
+        None  # None = omit --host flag, let marimo use its default
+    )
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
@@ -91,6 +123,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         timeout=cfg.timeout,
         base_url=_get_base_url(),
         no_sandbox=bool(cfg.no_sandbox),
+        host=cfg.host,
     )
 
 
