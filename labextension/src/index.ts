@@ -48,6 +48,7 @@ const CommandIDs = {
   newNotebook: 'marimo:new-notebook',
   openEditor: 'marimo:open-editor',
   copyAppLink: 'marimo:copy-app-link',
+  newNotebookInFolder: 'marimo:new-notebook-in-folder',
 } as const;
 
 /**
@@ -97,6 +98,112 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // Register the Marimo file type for _mo.py files
     app.docRegistry.addFileType(marimoFileType as DocumentRegistry.IFileType);
+
+    // Shared helper: prompt for filename and create a notebook stub in the given directory
+    async function createNotebookAt(
+      cwd: string,
+      venv: string | undefined,
+    ): Promise<void> {
+      const browser = fileBrowserFactory.tracker.currentWidget;
+      const contentsManager = app.serviceManager.contents;
+      let done = false;
+      while (!done) {
+        const nameResult = await InputDialog.getText({
+          title: 'New marimo Notebook',
+          label: 'Notebook name:',
+          text: '',
+        });
+        if (!nameResult.button.accept) return;
+
+        let filename = (nameResult.value ?? '').trim();
+        if (!filename) {
+          await showErrorMessage('Invalid Filename', 'Please enter a notebook name.');
+          continue;
+        }
+
+        filename = filename.replace(/[ -]/g, '_');
+        if (!filename.endsWith('.py') && !filename.endsWith('.md')) {
+          filename += '.py';
+        }
+
+        const filePath = cwd ? `${cwd}/${filename}` : filename;
+
+        let fileExists = false;
+        try {
+          await contentsManager.get(filePath, { content: false });
+          fileExists = true;
+        } catch {
+          // File doesn't exist - good to proceed
+        }
+
+        const existingWidget = fileExists ? getWidgetByFilePath(filePath) : null;
+
+        if (fileExists) {
+          const confirmResult = await showDialog({
+            title: 'File Exists',
+            body: `"${filename}" already exists. Overwrite?`,
+            buttons: [
+              Dialog.cancelButton(),
+              Dialog.warnButton({ label: 'Overwrite' }),
+            ],
+          });
+          if (!confirmResult.button.accept) continue;
+
+          if (existingWidget) {
+            try {
+              const sessionsResponse = await fetch(
+                `${marimoBaseUrl}api/home/running_notebooks`,
+                { method: 'POST', credentials: 'same-origin' },
+              );
+              if (sessionsResponse.ok) {
+                const data = (await sessionsResponse.json()) as {
+                  files?: { sessionId: string; path: string }[];
+                };
+                const session = data.files?.find((s) => s.path === filePath);
+                if (session) {
+                  await fetch(`${marimoBaseUrl}api/home/shutdown_session`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: session.sessionId }),
+                  });
+                }
+              }
+            } catch {
+              // Continue even if shutdown fails
+            }
+          }
+        }
+
+        const settings = ServerConnection.makeSettings();
+        const response = await ServerConnection.makeRequest(
+          `${settings.baseUrl}marimo-tools/create-stub`,
+          { method: 'POST', body: JSON.stringify({ path: filePath, venv }) },
+          settings,
+        );
+        const result = (await response.json()) as {
+          success: boolean;
+          error?: string;
+        };
+        if (!response.ok || !result.success) {
+          throw new Error(result.error ?? 'Failed to create notebook');
+        }
+
+        if (browser) await browser.model.refresh();
+
+        if (existingWidget) {
+          refreshWidgetByFilePath(filePath);
+          shell.activateById(existingWidget.id);
+          done = true;
+          continue;
+        }
+
+        const widget = createMarimoWidget(marimoBaseUrl, { filePath });
+        shell.add(widget, 'main');
+        shell.activateById(widget.id);
+        done = true;
+      }
+    }
 
     // Command: Edit Python file with marimo
     commands.addCommand(CommandIDs.openFile, {
@@ -299,145 +406,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
           );
           const venv = selectedKernel?.argv[0];
 
-          // Get current directory from file browser (needed before loop)
+          // Get current directory from file browser
           const browser = fileBrowserFactory.tracker.currentWidget;
           const cwd = browser?.model.path || '';
-          const contentsManager = app.serviceManager.contents;
 
-          // Loop until valid filename or user cancels
-          let done = false;
-          while (!done) {
-            // Prompt for notebook name
-            const nameResult = await InputDialog.getText({
-              title: 'New marimo Notebook',
-              label: 'Notebook name:',
-              text: '',
-            });
-
-            if (!nameResult.button.accept) {
-              return; // User clicked Cancel - exit completely
-            }
-
-            let filename = (nameResult.value ?? '').trim();
-
-            // Require non-empty filename
-            if (!filename) {
-              await showErrorMessage(
-                'Invalid Filename',
-                'Please enter a notebook name.',
-              );
-              continue; // Loop back to prompt
-            }
-
-            // Sanitize: convert spaces and hyphens to underscores
-            filename = filename.replace(/[ -]/g, '_');
-
-            // Ensure valid extension (.py or .md)
-            if (!filename.endsWith('.py') && !filename.endsWith('.md')) {
-              filename += '.py';
-            }
-
-            const filePath = cwd ? `${cwd}/${filename}` : filename;
-
-            // Check if file exists and confirm overwrite
-            let fileExists = false;
-            try {
-              await contentsManager.get(filePath, { content: false });
-              fileExists = true;
-            } catch {
-              // File doesn't exist - good to proceed
-            }
-
-            // Check for existing widget before overwrite logic
-            const existingWidget = fileExists
-              ? getWidgetByFilePath(filePath)
-              : null;
-
-            if (fileExists) {
-              const confirmResult = await showDialog({
-                title: 'File Exists',
-                body: `"${filename}" already exists. Overwrite?`,
-                buttons: [
-                  Dialog.cancelButton(),
-                  Dialog.warnButton({ label: 'Overwrite' }),
-                ],
-              });
-              if (!confirmResult.button.accept) {
-                continue; // User declined - loop back to rename
-              }
-
-              // Shutdown existing session if there's an open tab
-              if (existingWidget) {
-                try {
-                  const sessionsResponse = await fetch(
-                    `${marimoBaseUrl}api/home/running_notebooks`,
-                    { method: 'POST', credentials: 'same-origin' },
-                  );
-                  if (sessionsResponse.ok) {
-                    const data = (await sessionsResponse.json()) as {
-                      files?: { sessionId: string; path: string }[];
-                    };
-                    const session = data.files?.find(
-                      (s) => s.path === filePath,
-                    );
-                    if (session) {
-                      await fetch(
-                        `${marimoBaseUrl}api/home/shutdown_session`,
-                        {
-                          method: 'POST',
-                          credentials: 'same-origin',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            sessionId: session.sessionId,
-                          }),
-                        },
-                      );
-                    }
-                  }
-                } catch {
-                  // Continue even if shutdown fails
-                }
-              }
-            }
-
-            // Create stub file via backend
-            const settings = ServerConnection.makeSettings();
-            const response = await ServerConnection.makeRequest(
-              `${settings.baseUrl}marimo-tools/create-stub`,
-              {
-                method: 'POST',
-                body: JSON.stringify({ path: filePath, venv }),
-              },
-              settings,
-            );
-
-            const result = (await response.json()) as {
-              success: boolean;
-              error?: string;
-            };
-            if (!response.ok || !result.success) {
-              throw new Error(result.error ?? 'Failed to create notebook');
-            }
-
-            // Refresh file browser
-            if (browser) {
-              await browser.model.refresh();
-            }
-
-            // If we had an existing widget, refresh it instead of creating new
-            if (existingWidget) {
-              refreshWidgetByFilePath(filePath);
-              shell.activateById(existingWidget.id);
-              done = true;
-              continue;
-            }
-
-            // Open the created file in marimo
-            const widget = createMarimoWidget(marimoBaseUrl, { filePath });
-            shell.add(widget, 'main');
-            shell.activateById(widget.id);
-            done = true;
-          }
+          await createNotebookAt(cwd, venv);
         } catch {
           // Fall back to opening marimo directly on any error
           const widget = createMarimoWidget(marimoBaseUrl, {
@@ -445,6 +418,94 @@ const plugin: JupyterFrontEndPlugin<void> = {
           });
           shell.add(widget, 'main');
           shell.activateById(widget.id);
+        }
+      },
+    });
+
+    // Command: Create new marimo notebook (right-click context menu)
+    commands.addCommand(CommandIDs.newNotebookInFolder, {
+      label: 'New marimo Notebook',
+      caption: 'Create a new marimo notebook here',
+      icon: marimoIcon,
+      execute: async () => {
+        const browser = fileBrowserFactory.tracker.currentWidget;
+        const selectedItem = browser?.selectedItems().next();
+        const cwd =
+          !selectedItem?.done &&
+          selectedItem?.value?.type === 'directory'
+            ? selectedItem.value.path
+            : browser?.model.path || '';
+
+        try {
+          const settings = ServerConnection.makeSettings();
+          let noSandbox = false;
+          try {
+            const configResponse = await ServerConnection.makeRequest(
+              `${settings.baseUrl}marimo-tools/config`,
+              { method: 'GET' },
+              settings,
+            );
+            if (configResponse.ok) {
+              const configData = (await configResponse.json()) as {
+                no_sandbox: boolean;
+              };
+              noSandbox = configData.no_sandbox;
+            }
+          } catch {
+            // assume sandbox enabled
+          }
+
+          let venv: string | undefined;
+
+          if (!noSandbox) {
+            const specs = await KernelSpecAPI.getSpecs();
+            const kernelEntries: {
+              name: string;
+              displayName: string;
+              argv: string[];
+            }[] = [];
+            if (specs?.kernelspecs) {
+              for (const [name, spec] of Object.entries(specs.kernelspecs)) {
+                if (!spec) continue;
+                const argv = spec.argv ?? [];
+                if (argv.length > 0) {
+                  const pythonPath = argv[0];
+                  if (!pythonPath.includes('/') && !pythonPath.includes('\\'))
+                    continue;
+                  kernelEntries.push({
+                    name,
+                    displayName: spec.display_name ?? name,
+                    argv,
+                  });
+                }
+              }
+            }
+
+            if (kernelEntries.length > 0) {
+              const items = [
+                'Default (no venv)',
+                ...kernelEntries.map((k) => k.displayName),
+              ];
+              const kernelResult = await InputDialog.getItem({
+                title: 'Select Python Environment',
+                label: 'Kernel:',
+                items,
+                current: 0,
+              });
+              if (!kernelResult.button.accept || kernelResult.value === null)
+                return;
+              if (kernelResult.value !== 'Default (no venv)') {
+                const selectedKernel = kernelEntries.find(
+                  (k) => k.displayName === kernelResult.value,
+                );
+                venv = selectedKernel?.argv[0];
+              }
+            }
+          }
+
+          await createNotebookAt(cwd, venv);
+        } catch {
+          showErrorMessage('Error', 'Failed to create notebook in folder');
         }
       },
     });
@@ -524,6 +585,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
       command: CommandIDs.copyAppLink,
       selector: '.jp-DirListing-item[data-isdir="false"]',
       rank: 49,
+    });
+
+    app.contextMenu.addItem({
+      command: CommandIDs.newNotebookInFolder,
+      selector: '.jp-DirListing',
+      rank: 59,
     });
 
     // Add to launcher if available
