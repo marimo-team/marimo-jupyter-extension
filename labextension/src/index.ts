@@ -117,7 +117,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
         let filename = (nameResult.value ?? '').trim();
         if (!filename) {
-          await showErrorMessage('Invalid Filename', 'Please enter a notebook name.');
+          await showErrorMessage(
+            'Invalid Filename',
+            'Please enter a notebook name.',
+          );
           continue;
         }
 
@@ -136,7 +139,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
           // File doesn't exist - good to proceed
         }
 
-        const existingWidget = fileExists ? getWidgetByFilePath(filePath) : null;
+        const existingWidget = fileExists
+          ? getWidgetByFilePath(filePath)
+          : null;
 
         if (fileExists) {
           const confirmResult = await showDialog({
@@ -331,7 +336,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
-              const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+              const widget = createMarimoWidget(marimoBaseUrl, {
+                label: 'New Notebook',
+              });
               shell.add(widget, 'main');
               shell.activateById(widget.id);
             }
@@ -374,7 +381,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
-              const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+              const widget = createMarimoWidget(marimoBaseUrl, {
+                label: 'New Notebook',
+              });
               shell.add(widget, 'main');
               shell.activateById(widget.id);
             }
@@ -406,7 +415,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           // If Default selected and at root, open marimo directly
           if (!venv && !cwd) {
-            const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+            const widget = createMarimoWidget(marimoBaseUrl, {
+              label: 'New Notebook',
+            });
             shell.add(widget, 'main');
             shell.activateById(widget.id);
             return;
@@ -433,8 +444,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const browser = fileBrowserFactory.tracker.currentWidget;
         const selectedItem = browser?.selectedItems().next();
         const cwd =
-          !selectedItem?.done &&
-          selectedItem?.value?.type === 'directory'
+          !selectedItem?.done && selectedItem?.value?.type === 'directory'
             ? selectedItem.value.path
             : browser?.model.path || '';
 
