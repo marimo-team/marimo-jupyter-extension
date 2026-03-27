@@ -322,13 +322,19 @@ const plugin: JupyterFrontEndPlugin<void> = {
             // If config fetch fails, assume sandbox enabled (default)
           }
 
-          // If sandbox is disabled, skip venv picker (venv selection won't work)
+          const browser = fileBrowserFactory.tracker.currentWidget;
+          const cwd = browser?.model.path || '';
+
+          // If sandbox is disabled, skip venv picker
+          // If navigated into a subdirectory, prompt for name so file lands there
           if (noSandbox) {
-            const widget = createMarimoWidget(marimoBaseUrl, {
-              label: 'New Notebook',
-            });
-            shell.add(widget, 'main');
-            shell.activateById(widget.id);
+            if (cwd) {
+              await createNotebookAt(cwd, undefined);
+            } else {
+              const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+              shell.add(widget, 'main');
+              shell.activateById(widget.id);
+            }
             return;
           }
 
@@ -363,13 +369,15 @@ const plugin: JupyterFrontEndPlugin<void> = {
             }
           }
 
-          // If no venv kernels, skip dropdown and open marimo directly
+          // If no venv kernels, skip dropdown
           if (kernelEntries.length === 0) {
-            const widget = createMarimoWidget(marimoBaseUrl, {
-              label: 'New Notebook',
-            });
-            shell.add(widget, 'main');
-            shell.activateById(widget.id);
+            if (cwd) {
+              await createNotebookAt(cwd, undefined);
+            } else {
+              const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+              shell.add(widget, 'main');
+              shell.activateById(widget.id);
+            }
             return;
           }
 
@@ -390,25 +398,19 @@ const plugin: JupyterFrontEndPlugin<void> = {
             return;
           }
 
-          // If "Default" selected, open marimo directly (no file creation)
-          if (kernelResult.value === 'Default (no venv)') {
-            const widget = createMarimoWidget(marimoBaseUrl, {
-              label: 'New Notebook',
-            });
-            shell.add(widget, 'main');
-            shell.activateById(widget.id);
-            return;
-          }
-
-          // Get venv path from selected kernel
+          // Get venv path from selected kernel (undefined if Default)
           const selectedKernel = kernelEntries.find(
             (k) => k.displayName === kernelResult.value,
           );
           const venv = selectedKernel?.argv[0];
 
-          // Get current directory from file browser
-          const browser = fileBrowserFactory.tracker.currentWidget;
-          const cwd = browser?.model.path || '';
+          // If Default selected and at root, open marimo directly
+          if (!venv && !cwd) {
+            const widget = createMarimoWidget(marimoBaseUrl, { label: 'New Notebook' });
+            shell.add(widget, 'main');
+            shell.activateById(widget.id);
+            return;
+          }
 
           await createNotebookAt(cwd, venv);
         } catch {
