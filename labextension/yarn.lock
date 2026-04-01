@@ -141,9 +141,9 @@
     "@babel/helper-string-parser" "^7.27.1"
     "@babel/helper-validator-identifier" "^7.28.5"
 
-"@biomejs/biome@^1.9.4":
+"@biomejs/biome@1.9.4":
   version "1.9.4"
-  resolved "https://registry.npmjs.org/@biomejs/biome/-/biome-1.9.4.tgz"
+  resolved "https://registry.yarnpkg.com/@biomejs/biome/-/biome-1.9.4.tgz#89766281cbc3a0aae865a7ff13d6aaffea2842bf"
   integrity sha512-1rkd7G70+o9KkTn5KLmDYXihGoTaIGO9PIIN2ZB7UJxFrWw04CZHPYiMRjYsaDvVV7hP1dYNRLxSANLaBFGpog==
   optionalDependencies:
     "@biomejs/cli-darwin-arm64" "1.9.4"
@@ -559,9 +559,9 @@
     react "^18.2.0"
     sanitize-html "~2.12.1"
 
-"@jupyterlab/builder@^4.5.6":
+"@jupyterlab/builder@4.5.6":
   version "4.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/builder/-/builder-4.5.6.tgz"
+  resolved "https://registry.yarnpkg.com/@jupyterlab/builder/-/builder-4.5.6.tgz#50170e7141ae322e5f89b77fbb97e0db1e2e6ccf"
   integrity sha512-FFHfblGz1ZlWzswZWEvIjW5g0wVtOwrY9OLCJq4oZeTVKV5w4s+bEBnk3i+U5j+OZJ/3lsBLWWX/ZtDgvbnX2Q==
   dependencies:
     "@lumino/algorithm" "^2.0.4"
@@ -1270,7 +1270,7 @@
   resolved "https://registry.npmjs.org/@types/json-schema/-/json-schema-7.0.15.tgz"
   integrity sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==
 
-"@types/node@*", "@types/node@^24.0.0":
+"@types/node@*", "@types/node@24.12.0":
   version "24.12.0"
   resolved "https://registry.npmjs.org/@types/node/-/node-24.12.0.tgz"
   integrity sha512-GYDxsZi3ChgmckRT9HPU0WEhKLP08ev/Yfcq2AstjrDASOYCSXeyjDsHg4v5t4jOj7cyDX3vmprafKlWIG9MXQ==
@@ -1326,7 +1326,7 @@
   dependencies:
     "@types/yargs-parser" "*"
 
-"@typescript-eslint/eslint-plugin@^8.53.0":
+"@typescript-eslint/eslint-plugin@8.58.0":
   version "8.58.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/eslint-plugin/-/eslint-plugin-8.58.0.tgz#ad40e492f1931f46da1bd888e52b9e56df9063aa"
   integrity sha512-RLkVSiNuUP1C2ROIWfqX+YcUfLaSnxGE/8M+Y57lopVwg9VTYYfhuz15Yf1IzCKgZj6/rIbYTmJCUSqr76r0Wg==
@@ -1340,7 +1340,7 @@
     natural-compare "^1.4.0"
     ts-api-utils "^2.5.0"
 
-"@typescript-eslint/parser@^8.53.0":
+"@typescript-eslint/parser@8.58.0":
   version "8.58.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/parser/-/parser-8.58.0.tgz#da04ece1967b6c2fe8f10c3473dabf3825795ef7"
   integrity sha512-rLoGZIf9afaRBYsPUMtvkDWykwXwUPL60HebR4JgTI8mxfFe2cQTu3AGitANp4b9B2QlVru6WzjgB2IzJKiCSA==
@@ -2570,9 +2570,9 @@ eslint-plugin-react-hooks@^7.0.0:
     zod "^3.25.0 || ^4.0.0"
     zod-validation-error "^3.5.0 || ^4.0.0"
 
-eslint-plugin-react@^7.37.5:
+eslint-plugin-react@7.37.5:
   version "7.37.5"
-  resolved "https://registry.npmjs.org/eslint-plugin-react/-/eslint-plugin-react-7.37.5.tgz"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-react/-/eslint-plugin-react-7.37.5.tgz#2975511472bdda1b272b34d779335c9b0e877065"
   integrity sha512-Qteup0SqU15kdocexFNAJMvCJEfa2xUKNV4CC1xsVMrIIqEy3SQ/rqyxCWNzfrd3/ldy6HMlD2e0JDVpDg2qIA==
   dependencies:
     array-includes "^3.1.8"
@@ -2620,9 +2620,9 @@ eslint-visitor-keys@^5.0.0:
   resolved "https://registry.yarnpkg.com/eslint-visitor-keys/-/eslint-visitor-keys-5.0.1.tgz#9e3c9489697824d2d4ce3a8ad12628f91e9f59be"
   integrity sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==
 
-eslint@^8.57.1:
+eslint@8.57.1:
   version "8.57.1"
-  resolved "https://registry.npmjs.org/eslint/-/eslint-8.57.1.tgz"
+  resolved "https://registry.yarnpkg.com/eslint/-/eslint-8.57.1.tgz#7df109654aba7e3bbe5c8eae533c5e461d3c6ca9"
   integrity sha512-ypowyDxpVSYpkXr9WPv2PAZCtNip1Mv5KTW0SCurXv/9iOpcrH9PaqUElksqEB6pChqHGDRCFTyrZlGhnLNGiA==
   dependencies:
     "@eslint-community/eslint-utils" "^4.2.0"
@@ -3857,9 +3857,9 @@ npm-normalize-package-bin@^4.0.0:
   resolved "https://registry.npmjs.org/npm-normalize-package-bin/-/npm-normalize-package-bin-4.0.0.tgz"
   integrity sha512-TZKxPvItzai9kN9H/TkmCtx/ZN/hvr3vUycjlfmH0ootY9yFBzNOpiXAdIn1Iteqsvk4lQn6B5PTrt+n6h8k/w==
 
-npm-run-all2@^8.0.0:
+npm-run-all2@8.0.4:
   version "8.0.4"
-  resolved "https://registry.npmjs.org/npm-run-all2/-/npm-run-all2-8.0.4.tgz"
+  resolved "https://registry.yarnpkg.com/npm-run-all2/-/npm-run-all2-8.0.4.tgz#bcc070fd0cdb8d45496ec875d99a659a112e3f74"
   integrity sha512-wdbB5My48XKp2ZfJUlhnLVihzeuA1hgBnqB2J9ahV77wLS+/YAJAlN8I+X3DIFIPZ3m5L7nplmlbhNiFDmXRDA==
   dependencies:
     ansi-styles "^6.2.1"
@@ -3871,9 +3871,9 @@ npm-run-all2@^8.0.0:
     shell-quote "^1.7.3"
     which "^5.0.0"
 
-npm-run-all@^4.1.5:
+npm-run-all@4.1.5:
   version "4.1.5"
-  resolved "https://registry.npmjs.org/npm-run-all/-/npm-run-all-4.1.5.tgz"
+  resolved "https://registry.yarnpkg.com/npm-run-all/-/npm-run-all-4.1.5.tgz#04476202a15ee0e2e214080861bff12a51d98fba"
   integrity sha512-Oo82gJDAVcaMdi3nuoKFavkIHBRVqQ1qvMb+9LHk/cF4P6B2m8aP04hGf7oL6wZ9BuGwX1onlLhpuoofSyoQDQ==
   dependencies:
     ansi-styles "^3.2.1"
@@ -4370,20 +4370,20 @@ reusify@^1.0.4:
   resolved "https://registry.npmjs.org/reusify/-/reusify-1.1.0.tgz"
   integrity sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==
 
+rimraf@6.1.3:
+  version "6.1.3"
+  resolved "https://registry.yarnpkg.com/rimraf/-/rimraf-6.1.3.tgz#afbee236b3bd2be331d4e7ce4493bac1718981af"
+  integrity sha512-LKg+Cr2ZF61fkcaK1UdkH2yEBBKnYjTyWzTJT6KNPcSPaiT7HSdhtMXQuN5wkTX0Xu72KQ1l8S42rlmexS2hSA==
+  dependencies:
+    glob "^13.0.3"
+    package-json-from-dist "^1.0.1"
+
 rimraf@^3.0.2:
   version "3.0.2"
   resolved "https://registry.npmjs.org/rimraf/-/rimraf-3.0.2.tgz"
   integrity sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==
   dependencies:
     glob "^7.1.3"
-
-rimraf@^6.0.0:
-  version "6.1.3"
-  resolved "https://registry.npmjs.org/rimraf/-/rimraf-6.1.3.tgz"
-  integrity sha512-LKg+Cr2ZF61fkcaK1UdkH2yEBBKnYjTyWzTJT6KNPcSPaiT7HSdhtMXQuN5wkTX0Xu72KQ1l8S42rlmexS2hSA==
-  dependencies:
-    glob "^13.0.3"
-    package-json-from-dist "^1.0.1"
 
 rollup@^4.43.0:
   version "4.60.1"
@@ -5058,9 +5058,9 @@ typed-array-length@^1.0.7:
     possible-typed-array-names "^1.0.0"
     reflect.getprototypeof "^1.0.6"
 
-typescript@~5.9.0:
+typescript@5.9.3:
   version "5.9.3"
-  resolved "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz#5b4f59e15310ab17a216f5d6cf53ee476ede670f"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==
 
 typestyle@^2.0.4:
@@ -5187,9 +5187,9 @@ vite-node@3.2.4:
   optionalDependencies:
     fsevents "~2.3.3"
 
-vitest@^3.2.4:
+vitest@3.2.4:
   version "3.2.4"
-  resolved "https://registry.npmjs.org/vitest/-/vitest-3.2.4.tgz"
+  resolved "https://registry.yarnpkg.com/vitest/-/vitest-3.2.4.tgz#0637b903ad79d1539a25bc34c0ed54b5c67702ea"
   integrity sha512-LUCP5ev3GURDysTWiP47wRRUpLKMOfPh+yKTx3kVIEiu5KOMeqzpnYNsKyOoVrULivR8tLcks4+lga33Whn90A==
   dependencies:
     "@types/chai" "^5.2.2"
