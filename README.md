@@ -93,9 +93,12 @@ c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"
 
 # Startup timeout (default: 60s)
 c.MarimoProxyConfig.timeout = 120
+
+# Enable marimo debug logging for spawn troubleshooting
+c.MarimoProxyConfig.debug = True
 ```
 
-See [Configuration Guide](https://marimo-team.github.io/marimo-jupyter-extension/configuration/) and [JupyterHub Deployment](https://marimo-team.github.io/marimo-jupyter-extension/jupyterhub/) for more details.
+See [Configuration Guide](https://marimo-team.github.io/marimo-jupyter-extension/configuration/), [Troubleshooting Guide](https://marimo-team.github.io/marimo-jupyter-extension/troubleshooting/), and [JupyterHub Deployment](https://marimo-team.github.io/marimo-jupyter-extension/jupyterhub/) for more details.
 
 ## Migrating from jupyter-marimo-proxy
 

@@ -28,6 +28,10 @@ c.MarimoProxyConfig.no_sandbox = False
 
 # Startup timeout in seconds (default: 60)
 c.MarimoProxyConfig.timeout = 120
+
+# Enable marimo debug logging for spawn troubleshooting.
+# This adds the global marimo CLI flag `--log-level DEBUG`.
+c.MarimoProxyConfig.debug = True
 ```
 
 ## Spawner Environment

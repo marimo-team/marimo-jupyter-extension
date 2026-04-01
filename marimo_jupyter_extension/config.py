@@ -34,6 +34,7 @@ class MarimoProxyConfig(Configurable):
         c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
         c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"  # enables uvx mode
         c.MarimoProxyConfig.timeout = 120
+        c.MarimoProxyConfig.debug = True
     """
 
     marimo_path = Unicode(
@@ -52,6 +53,14 @@ class MarimoProxyConfig(Configurable):
     timeout = Int(
         DEFAULT_TIMEOUT,
         help="Timeout in seconds for marimo to start.",
+    ).tag(config=True)
+
+    debug = Bool(
+        default_value=False,
+        help=(
+            "Enable marimo debug logging by passing "
+            "'--log-level DEBUG' to the spawned process."
+        ),
     ).tag(config=True)
 
     no_sandbox = Bool(
@@ -96,6 +105,7 @@ class Config:
     uvx_path: str | None  # If set, use uvx mode
     timeout: int
     base_url: str
+    debug: bool = False
     no_sandbox: bool = False  # Keep sandbox as default
     host: str | None = (
         None  # None = omit --host flag, let marimo use its default
@@ -122,6 +132,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         uvx_path=cfg.uvx_path,
         timeout=cfg.timeout,
         base_url=_get_base_url(),
+        debug=bool(cfg.debug),
         no_sandbox=bool(cfg.no_sandbox),
         host=cfg.host,
     )

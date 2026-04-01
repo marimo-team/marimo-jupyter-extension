@@ -30,6 +30,7 @@ def setup_marimoserver():
     return {
         "command": [
             *marimo_cmd,
+            *(["--log-level", "DEBUG"] if config.debug else []),
             "edit",
             *([] if config.no_sandbox else ["--sandbox"]),
             "--port",

@@ -69,13 +69,25 @@ pip install 'marimo>=0.21.1'
 
 ### Debug Mode
 
-To see detailed proxy logs, check the JupyterHub logs:
+To diagnose marimo launch failures, enable debug logging in your Jupyter
+config so spawned marimo processes run with `--log-level DEBUG`:
+
+```python
+c.MarimoProxyConfig.debug = True
+```
+
+This is the recommended way to troubleshoot both initial launch failures and
+restart-triggered respawn failures. The restart endpoint only clears the old
+process; any actual failure happens on the next marimo spawn attempt and will
+show up in the logs.
+
+For JupyterHub, check the service logs while reproducing the issue:
 
 ```bash
 journalctl -u jupyterhub -f
 ```
 
-Or for local JupyterLab:
+For local JupyterLab, start Jupyter with debug logging enabled:
 
 ```bash
 jupyter lab --debug

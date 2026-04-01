@@ -89,8 +89,6 @@ class TestSetupMarimoserver:
         self, clean_env, mock_marimo_in_path
     ):
         """Command should omit --sandbox when no_sandbox is True."""
-        from unittest.mock import patch
-
         from marimo_jupyter_extension.config import Config
 
         mock_config = Config(
@@ -110,6 +108,43 @@ class TestSetupMarimoserver:
             result = setup_marimoserver()
 
         assert "--sandbox" not in result["command"]
+
+    def test_command_excludes_log_level_by_default(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """Command should omit --log-level when debug is False."""
+        from marimo_jupyter_extension import setup_marimoserver
+
+        result = setup_marimoserver()
+
+        assert "--log-level" not in result["command"]
+
+    def test_command_includes_debug_log_level_when_debug_enabled(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """Command should include --log-level DEBUG when debug is True."""
+        from marimo_jupyter_extension.config import Config
+
+        mock_config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            debug=True,
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_config",
+            return_value=mock_config,
+        ):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            result = setup_marimoserver()
+
+        cmd = result["command"]
+        assert "--log-level" in cmd
+        assert cmd[cmd.index("--log-level") + 1] == "DEBUG"
+        assert cmd.index("--log-level") < cmd.index("edit")
 
 
 class TestTokenAuthentication:

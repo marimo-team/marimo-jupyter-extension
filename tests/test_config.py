@@ -88,6 +88,14 @@ class TestMarimoProxyConfig:
 
         assert config.timeout == DEFAULT_TIMEOUT
 
+    def test_default_debug_is_false(self, clean_env):
+        """Default debug should be False."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        assert config.debug is False
+
     def test_uvx_path_from_uv_env(self, clean_env):
         """uvx_path should derive from UV env var."""
         os.environ["UV"] = "/custom/path/uv"
@@ -128,6 +136,7 @@ class TestGetConfig:
         assert hasattr(result, "uvx_path")
         assert hasattr(result, "timeout")
         assert hasattr(result, "base_url")
+        assert hasattr(result, "debug")
         assert hasattr(result, "no_sandbox")
 
     def test_base_url_with_prefix(self, clean_env, mock_marimo_in_path):
@@ -171,6 +180,30 @@ class TestGetConfig:
         result = get_config()
 
         assert result.no_sandbox is False
+
+    def test_debug_default_is_false(self, clean_env, mock_marimo_in_path):
+        """debug should default to False in get_config result."""
+        from marimo_jupyter_extension.config import get_config
+
+        result = get_config()
+
+        assert result.debug is False
+
+    def test_debug_applied_from_traitlets(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """debug should be applied from traitlets config."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.debug = True
+
+        result = get_config(traitlets_config)
+
+        assert result.debug is True
 
     def test_no_sandbox_applied_from_traitlets(
         self, clean_env, mock_marimo_in_path
