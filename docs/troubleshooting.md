@@ -48,6 +48,34 @@ which jupyter
 /path/to/venv/bin/pip install marimo
 ```
 
+### Packages work outside marimo but fail inside (sandbox incompatibility)
+
+**Cause**: marimo runs in sandbox mode by default, which creates an isolated temporary venv per notebook. Native libraries, ADBC drivers, and packages already installed in your project venv are not visible inside the sandbox.
+
+**Solution**: Disable sandbox mode.
+
+For standalone JupyterLab (no JupyterHub), pass a CLI flag when launching:
+
+```bash
+jupyter lab --MarimoProxyConfig.no_sandbox=True
+```
+
+Or add it permanently to `jupyter_server_config.py` (run `jupyter --config-dir` to locate it):
+
+```python
+c.MarimoProxyConfig.no_sandbox = True
+```
+
+For JupyterHub, add the same line to `jupyterhub_config.py`.
+
+> **Note**: Disabling sandbox mode removes per-notebook dependency management and the venv picker. Consider setting up a shared virtual environment instead if you need dependency isolation.
+
+### Cannot find jupyterhub_config.py
+
+**Cause**: `jupyterhub_config.py` only exists in JupyterHub deployments. If you launched JupyterLab directly from a venv, this file does not exist on your system.
+
+**Solution**: Use the [Standalone JupyterLab](configuration.md#standalone-jupyterlab) configuration approach instead — either a CLI flag or `jupyter_server_config.py`.
+
 ### Error: "No such option: --base-url"
 
 **Cause**: marimo version is too old.
@@ -69,12 +97,21 @@ pip install 'marimo>=0.21.1'
 
 ### Debug Mode
 
-To diagnose marimo launch failures, enable debug logging in your Jupyter
-config so spawned marimo processes run with `--log-level DEBUG`:
+To diagnose marimo launch failures, enable debug logging so spawned marimo processes run with `--log-level DEBUG`.
+
+For standalone JupyterLab, pass it as a CLI flag:
+
+```bash
+jupyter lab --MarimoProxyConfig.debug=True
+```
+
+Or add it to `jupyter_server_config.py` (run `jupyter --config-dir` to locate it):
 
 ```python
 c.MarimoProxyConfig.debug = True
 ```
+
+For JupyterHub, add the same line to `jupyterhub_config.py`.
 
 This is the recommended way to troubleshoot both initial launch failures and
 restart-triggered respawn failures. The restart endpoint only clears the old

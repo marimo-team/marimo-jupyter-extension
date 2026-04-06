@@ -7,7 +7,33 @@ By default, the extension searches for `marimo` in:
 1. System PATH (via `shutil.which`)
 2. Common locations: `~/.local/bin/marimo`, `/opt/bin/marimo`, `/usr/local/bin/marimo`
 
-## Traitlets Configuration
+## Standalone JupyterLab
+
+If you launched JupyterLab directly from a venv (not via JupyterHub), you configure the extension either via a CLI argument or a config file — there is no `jupyterhub_config.py`.
+
+**One-time (CLI argument)**
+
+Pass any `MarimoProxyConfig` option as a flag when starting JupyterLab:
+
+```bash
+jupyter lab --MarimoProxyConfig.no_sandbox=True
+```
+
+**Permanent (jupyter_server_config.py)**
+
+Find your Jupyter config directory:
+
+```bash
+jupyter --config-dir
+```
+
+Create or edit `jupyter_server_config.py` in that directory using the same traitlets syntax as below. For example:
+
+```python
+c.MarimoProxyConfig.no_sandbox = True
+```
+
+## Traitlets Configuration (JupyterHub)
 
 For JupyterHub deployments, configure the extension in `jupyterhub_config.py`:
 
