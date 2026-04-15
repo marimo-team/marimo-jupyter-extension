@@ -58,6 +58,26 @@ c.MarimoProxyConfig.timeout = 120
 # Enable marimo debug logging for spawn troubleshooting.
 # This adds the global marimo CLI flag `--log-level DEBUG`.
 c.MarimoProxyConfig.debug = True
+
+# Watch notebook files for external changes and reload automatically.
+# Useful when editing .py notebooks with Claude Code, Cursor, vim, or other
+# external editors while the notebook is open in the browser (default: False).
+c.MarimoProxyConfig.watch = True
+
+# Allowed origins for CORS (default: [] — same-origin only).
+# Set to ["*"] to allow all origins, or list specific origins.
+c.MarimoProxyConfig.allow_origins = ["https://example.com"]
+
+# Suppress the marimo version-check network call on startup (default: False).
+c.MarimoProxyConfig.skip_update_check = True
+
+# Minutes of no browser connection before marimo shuts itself down.
+# None (the default) keeps the server running indefinitely.
+c.MarimoProxyConfig.idle_timeout = 30.0
+
+# Seconds to keep a session alive after a websocket disconnect.
+# None (the default) keeps sessions open indefinitely.
+c.MarimoProxyConfig.session_ttl = 300
 ```
 
 ## Spawner Environment
