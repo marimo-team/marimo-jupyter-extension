@@ -27,34 +27,35 @@ import pytest
 
 # Passed to marimo by the proxy itself — not user-configurable.
 HARDCODED_OPTIONS: set[str] = {
-    "--port",             # injected by jupyter-server-proxy as {port}
-    "--headless",         # always set; proxy handles browser launching
-    "--token",            # always enabled; token auth is required
-    "--token-password",   # auto-generated via secrets.token_urlsafe(16)
+    "--port",  # injected by jupyter-server-proxy as {port}
+    "--headless",  # always set; proxy handles browser launching
+    "--token",  # always enabled; token auth is required
+    "--token-password",  # auto-generated via secrets.token_urlsafe(16)
     "--no-skew-protection",  # required for proxy compat (version mismatch ok)
-    "--base-url",         # auto-configured from JUPYTERHUB_SERVICE_PREFIX
+    "--base-url",  # auto-configured from JUPYTERHUB_SERVICE_PREFIX
 }
 
 # Mapped to MarimoProxyConfig traitlets in config.py — user-configurable.
 EXPOSED_OPTIONS: set[str] = {
-    "--sandbox", "--no-sandbox",  # config: no_sandbox (default: sandbox on)
-    "--host",                     # config: host (auto-detected localhost)
-    "--watch",                    # config: watch
-    "--allow-origins",            # config: allow_origins
-    "--skip-update-check",        # config: skip_update_check
-    "--timeout",                  # config: idle_timeout
-    "--session-ttl",              # config: session_ttl
+    "--sandbox",
+    "--no-sandbox",  # config: no_sandbox (default: sandbox on)
+    "--host",  # config: host (auto-detected localhost)
+    "--watch",  # config: watch
+    "--allow-origins",  # config: allow_origins
+    "--skip-update-check",  # config: skip_update_check
+    "--timeout",  # config: idle_timeout
+    "--session-ttl",  # config: session_ttl
 }
 
 # Deliberately not exposed — not applicable in a proxy deployment.
 EXCLUDED_OPTIONS: set[str] = {
-    "--proxy",              # upstream reverse proxy address, not this proxy
-    "--no-token",           # token auth is always required by the proxy
+    "--proxy",  # upstream reverse proxy address, not this proxy
+    "--no-token",  # token auth is always required by the proxy
     "--token-password-file",  # token is auto-generated; file mode not needed
-    "--trusted",            # requires Docker; not applicable here
-    "--untrusted",          # requires Docker; not applicable here
-    "--skew-protection",    # hardcoded to --no-skew-protection
-    "--help",               # meta-option, not a marimo server flag
+    "--trusted",  # requires Docker; not applicable here
+    "--untrusted",  # requires Docker; not applicable here
+    "--skew-protection",  # hardcoded to --no-skew-protection
+    "--help",  # meta-option, not a marimo server flag
 }
 
 ALL_KNOWN: set[str] = HARDCODED_OPTIONS | EXPOSED_OPTIONS | EXCLUDED_OPTIONS
@@ -74,7 +75,16 @@ def get_marimo_edit_options(uv_exe: str | None = None) -> set[str]:
     if exe is None:
         raise FileNotFoundError("uv executable not found.")
     result = subprocess.run(
-        [exe, "run", "--no-project", "--with", "marimo", "marimo", "edit", "--help"],
+        [
+            exe,
+            "run",
+            "--no-project",
+            "--with",
+            "marimo",
+            "marimo",
+            "edit",
+            "--help",
+        ],
         capture_output=True,
         text=True,
         timeout=60,
@@ -113,21 +123,21 @@ def print_report(
     for opt in sorted(hardcoded):
         print(f"      {opt}")
 
-    print(f"\n  ✓ exposed    (MarimoProxyConfig traitlets)")
+    print("\n  ✓ exposed    (MarimoProxyConfig traitlets)")
     for opt in sorted(exposed):
         print(f"      {opt}")
 
-    print(f"\n  – excluded   (deliberately omitted)")
+    print("\n  – excluded   (deliberately omitted)")
     for opt in sorted(excluded):
         print(f"      {opt}")
 
     if unknown:
-        print(f"\n  ✗ UNKNOWN    (unaccounted — add to a category above!)")
+        print("\n  ✗ UNKNOWN    (unaccounted — add to a category above!)")
         for opt in sorted(unknown):
             print(f"      {opt}")
         print()
     else:
-        print(f"\n  All options accounted for.\n")
+        print("\n  All options accounted for.\n")
 
 
 # ---------------------------------------------------------------------------

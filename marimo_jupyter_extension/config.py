@@ -80,8 +80,9 @@ class MarimoProxyConfig(Configurable):
     watch = Bool(
         default_value=False,
         help=(
-            "Watch notebook files for external changes and reload automatically. "
-            "Useful when editing .py notebooks with an external editor."
+            "Watch notebook files for external changes and reload "
+            "automatically. Useful when editing .py notebooks with an "
+            "external editor."
         ),
     ).tag(config=True)
 
@@ -89,13 +90,16 @@ class MarimoProxyConfig(Configurable):
         Unicode(),
         help=(
             "Allowed origins for CORS. Can be set to ['*'] for all origins. "
-            "Example: c.MarimoProxyConfig.allow_origins = ['https://example.com']"
+            "Example: "
+            "c.MarimoProxyConfig.allow_origins = ['https://marimo.io']"
         ),
     ).tag(config=True)
 
     skip_update_check = Bool(
         default_value=False,
-        help="Don't check if a new version of marimo is available for download.",
+        help=(
+            "Don't check if a new version of marimo is available for download."
+        ),
     ).tag(config=True)
 
     idle_timeout = Float(
@@ -109,8 +113,8 @@ class MarimoProxyConfig(Configurable):
     session_ttl = Int(
         allow_none=True,
         help=(
-            "Seconds to wait before closing a session on websocket disconnect. "
-            "None (the default) keeps sessions open indefinitely."
+            "Seconds to wait before closing a session on websocket "
+            "disconnect. None (the default) keeps sessions open indefinitely."
         ),
     ).tag(config=True)
 
@@ -144,7 +148,9 @@ class Config:
     base_url: str
     debug: bool = False
     no_sandbox: bool = False  # Keep sandbox as default
-    host: str | None = None  # None = omit --host flag, let marimo use its default
+    host: str | None = (
+        None  # None = omit --host flag, let marimo use its default
+    )
     watch: bool = False
     allow_origins: tuple[str, ...] = ()
     skip_update_check: bool = False
