@@ -43,6 +43,23 @@ def setup_marimoserver():
             token,
             "--headless",
             "--no-skew-protection",
+            *(["--watch"] if config.watch else []),
+            *[
+                arg
+                for o in config.allow_origins
+                for arg in ("--allow-origins", o)
+            ],
+            *(["--skip-update-check"] if config.skip_update_check else []),
+            *(
+                ["--timeout", str(config.idle_timeout)]
+                if config.idle_timeout is not None
+                else []
+            ),
+            *(
+                ["--session-ttl", str(config.session_ttl)]
+                if config.session_ttl is not None
+                else []
+            ),
         ],
         "timeout": config.timeout,
         "absolute_url": True,

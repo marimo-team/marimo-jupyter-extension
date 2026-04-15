@@ -96,6 +96,21 @@ c.MarimoProxyConfig.timeout = 120
 
 # Enable marimo debug logging for spawn troubleshooting
 c.MarimoProxyConfig.debug = True
+
+# Watch files for external edits (Claude Code, Cursor, vim, etc.)
+c.MarimoProxyConfig.watch = True
+
+# Allowed CORS origins (default: same-origin only)
+c.MarimoProxyConfig.allow_origins = ["*"]
+
+# Suppress version-check network call on startup
+c.MarimoProxyConfig.skip_update_check = True
+
+# Shut down after N minutes of no browser connection
+c.MarimoProxyConfig.idle_timeout = 30.0
+
+# Keep sessions alive N seconds after websocket disconnect
+c.MarimoProxyConfig.session_ttl = 300
 ```
 
 See [Configuration Guide](https://marimo-team.github.io/marimo-jupyter-extension/configuration/), [Troubleshooting Guide](https://marimo-team.github.io/marimo-jupyter-extension/troubleshooting/), and [JupyterHub Deployment](https://marimo-team.github.io/marimo-jupyter-extension/jupyterhub/) for more details.

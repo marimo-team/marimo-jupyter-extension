@@ -5,7 +5,7 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 
-from traitlets import Bool, Int, Unicode, default
+from traitlets import Bool, Float, Int, List, Unicode, default
 from traitlets.config import Configurable
 
 DEFAULT_TIMEOUT = 60
@@ -77,6 +77,47 @@ class MarimoProxyConfig(Configurable):
         ),
     ).tag(config=True)
 
+    watch = Bool(
+        default_value=False,
+        help=(
+            "Watch notebook files for external changes and reload "
+            "automatically. Useful when editing .py notebooks with an "
+            "external editor."
+        ),
+    ).tag(config=True)
+
+    allow_origins = List(
+        Unicode(),
+        help=(
+            "Allowed origins for CORS. Can be set to ['*'] for all origins. "
+            "Example: "
+            "c.MarimoProxyConfig.allow_origins = ['https://marimo.io']"
+        ),
+    ).tag(config=True)
+
+    skip_update_check = Bool(
+        default_value=False,
+        help=(
+            "Don't check if a new version of marimo is available for download."
+        ),
+    ).tag(config=True)
+
+    idle_timeout = Float(
+        allow_none=True,
+        help=(
+            "Minutes of no connection before shutting down the marimo server. "
+            "None (the default) means the server runs indefinitely."
+        ),
+    ).tag(config=True)
+
+    session_ttl = Int(
+        allow_none=True,
+        help=(
+            "Seconds to wait before closing a session on websocket "
+            "disconnect. None (the default) keeps sessions open indefinitely."
+        ),
+    ).tag(config=True)
+
     @default("host")
     def _default_host(self):
         return _detect_localhost_host()
@@ -110,6 +151,11 @@ class Config:
     host: str | None = (
         None  # None = omit --host flag, let marimo use its default
     )
+    watch: bool = False
+    allow_origins: tuple[str, ...] = ()
+    skip_update_check: bool = False
+    idle_timeout: float | None = None
+    session_ttl: int | None = None
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
@@ -135,6 +181,11 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         debug=bool(cfg.debug),
         no_sandbox=bool(cfg.no_sandbox),
         host=cfg.host,
+        watch=bool(cfg.watch),
+        allow_origins=tuple(cfg.allow_origins),
+        skip_update_check=bool(cfg.skip_update_check),
+        idle_timeout=cfg.idle_timeout,
+        session_ttl=cfg.session_ttl,
     )
 
 
