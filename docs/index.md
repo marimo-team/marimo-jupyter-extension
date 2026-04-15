@@ -11,7 +11,7 @@ On JupyterHub deployments, this leverages existing authentication and spawning i
 ## Quick Start
 
 ```bash
-pip install 'marimo>=0.21.1' marimo-jupyter-extension
+pip install 'marimo>=0.23.1' marimo-jupyter-extension
 ```
 
 Launch JupyterLab and click the marimo icon in the launcher.
