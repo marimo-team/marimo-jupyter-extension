@@ -1,10 +1,13 @@
 import { PageConfig } from '@jupyterlab/coreutils';
 import type { CommandRegistry } from '@lumino/commands';
+import type { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { marimoIcon } from './icons';
 import { updateWidgetTitles } from './iframe-widget';
 
 const SIDEBAR_CLASS = 'jp-MarimoSidebar';
+const POLL_INTERVAL_MS = 5000;
+const HEALTH_FETCH_TIMEOUT_MS = 15000;
 
 interface RunningSession {
   sessionId: string;
@@ -13,6 +16,13 @@ interface RunningSession {
   initializationId: string;
   lastModified: number;
 }
+
+interface HealthStatus {
+  process_alive: boolean;
+  marimo_healthy: boolean;
+}
+
+type ServerState = 'running' | 'unhealthy' | 'stopped';
 
 /**
  * A sidebar panel for marimo quick actions.
@@ -25,6 +35,7 @@ export class MarimoSidebar extends Widget {
   private _statusText: HTMLElement | null = null;
   private _serverControlsContainer: HTMLElement | null = null;
   private _startServerContainer: HTMLElement | null = null;
+  private _hasAutoStarted = false;
 
   constructor(commands: CommandRegistry) {
     super();
@@ -35,14 +46,19 @@ export class MarimoSidebar extends Widget {
     this.title.caption = 'marimo';
 
     this._buildUI();
-    this._startPolling();
   }
 
   dispose(): void {
-    if (this._refreshInterval !== null) {
-      window.clearInterval(this._refreshInterval);
-    }
+    this._stopPolling();
     super.dispose();
+  }
+
+  protected onAfterShow(_msg: Message): void {
+    this._startPolling();
+  }
+
+  protected onAfterHide(_msg: Message): void {
+    this._stopPolling();
   }
 
   private _getMarimoBaseUrl(): string {
@@ -51,18 +67,44 @@ export class MarimoSidebar extends Widget {
   }
 
   private _startPolling(): void {
+    if (this._refreshInterval !== null) {
+      return; // Already polling
+    }
     // Initial check
     this._refreshStatus();
     // Refresh status and sessions every 5 seconds
     this._refreshInterval = window.setInterval(() => {
       this._refreshStatus();
-    }, 5000);
+    }, POLL_INTERVAL_MS);
+  }
+
+  private _stopPolling(): void {
+    if (this._refreshInterval !== null) {
+      window.clearInterval(this._refreshInterval);
+      this._refreshInterval = null;
+    }
   }
 
   private async _refreshStatus(): Promise<void> {
-    const isRunning = await this._checkServerStatus();
-    this._updateServerStatus(isRunning);
-    if (isRunning) {
+    const status = await this._checkHealth();
+    const state: ServerState =
+      status.process_alive && status.marimo_healthy
+        ? 'running'
+        : status.process_alive
+          ? 'unhealthy'
+          : 'stopped';
+
+    // Auto-start marimo on first load if it hasn't been started yet.
+    // The health endpoint never triggers ensure_process(), so we do
+    // a one-time probe through the proxy to kick off the process.
+    if (state === 'stopped' && !this._hasAutoStarted) {
+      this._hasAutoStarted = true;
+      this._startServer();
+      return;
+    }
+
+    this._updateServerStatus(state);
+    if (state === 'running') {
       await this._refreshSessions();
     } else {
       this._updateSessionsList([]);
@@ -110,7 +152,41 @@ export class MarimoSidebar extends Widget {
     }
   }
 
-  private async _isServerHealthy(): Promise<boolean> {
+  /**
+   * Check marimo health via the /marimo-tools/health endpoint, which
+   * checks process liveness before proxying to avoid the ensure_process()
+   * deadlock when the marimo process has exited.
+   */
+  private async _checkHealth(): Promise<HealthStatus> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      HEALTH_FETCH_TIMEOUT_MS,
+    );
+    try {
+      const baseUrl = PageConfig.getBaseUrl();
+      const response = await fetch(`${baseUrl}marimo-tools/health`, {
+        method: 'GET',
+        credentials: 'same-origin',
+        signal: controller.signal,
+      });
+      if (response.ok) {
+        return (await response.json()) as HealthStatus;
+      }
+      return { process_alive: false, marimo_healthy: false };
+    } catch {
+      return { process_alive: false, marimo_healthy: false };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Trigger the proxy to start marimo by hitting /marimo/health directly.
+   * This is used only during explicit "Start Server" — it intentionally
+   * goes through jupyter-server-proxy to trigger ensure_process().
+   */
+  private async _probeProxyHealth(): Promise<boolean> {
     try {
       const baseUrl = this._getMarimoBaseUrl();
       const response = await fetch(`${baseUrl}health`, {
@@ -118,9 +194,7 @@ export class MarimoSidebar extends Widget {
         credentials: 'same-origin',
       });
       if (response.ok) {
-        const data = (await response.json()) as {
-          status: string;
-        };
+        const data = (await response.json()) as { status: string };
         return data.status === 'healthy';
       }
       return false;
@@ -129,27 +203,34 @@ export class MarimoSidebar extends Widget {
     }
   }
 
-  private async _checkServerStatus(): Promise<boolean> {
-    return this._isServerHealthy();
-  }
-
-  private _updateServerStatus(isRunning: boolean): void {
+  private _updateServerStatus(state: ServerState): void {
     if (this._statusDot && this._statusText) {
-      if (isRunning) {
-        this._statusDot.className = 'jp-MarimoSidebar-statusDot jp-mod-ready';
-        this._statusText.textContent = 'Running';
-      } else {
-        this._statusDot.className = 'jp-MarimoSidebar-statusDot jp-mod-error';
-        this._statusText.textContent = 'Stopped';
+      switch (state) {
+        case 'running':
+          this._statusDot.className =
+            'jp-MarimoSidebar-statusDot jp-mod-ready';
+          this._statusText.textContent = 'Running';
+          break;
+        case 'unhealthy':
+          this._statusDot.className =
+            'jp-MarimoSidebar-statusDot jp-mod-warning';
+          this._statusText.textContent = 'Unhealthy';
+          break;
+        case 'stopped':
+          this._statusDot.className =
+            'jp-MarimoSidebar-statusDot jp-mod-error';
+          this._statusText.textContent = 'Stopped';
+          break;
       }
     }
+    // Show restart for running or unhealthy, start for stopped
     if (this._serverControlsContainer) {
-      this._serverControlsContainer.style.display = isRunning
-        ? 'flex'
-        : 'none';
+      this._serverControlsContainer.style.display =
+        state !== 'stopped' ? 'flex' : 'none';
     }
     if (this._startServerContainer) {
-      this._startServerContainer.style.display = isRunning ? 'none' : 'flex';
+      this._startServerContainer.style.display =
+        state === 'stopped' ? 'flex' : 'none';
     }
   }
 
@@ -162,8 +243,8 @@ export class MarimoSidebar extends Widget {
       // Making a request to the proxy URL triggers jupyter-server-proxy to start the process
       const maxAttempts = 15;
       for (let i = 0; i < maxAttempts; i++) {
-        if (await this._isServerHealthy()) {
-          this._updateServerStatus(true);
+        if (await this._probeProxyHealth()) {
+          this._updateServerStatus('running');
           await this._refreshSessions();
           return;
         }
@@ -171,9 +252,9 @@ export class MarimoSidebar extends Widget {
       }
 
       // If we get here, the server didn't start successfully
-      this._updateServerStatus(false);
+      this._updateServerStatus('stopped');
     } catch {
-      this._updateServerStatus(false);
+      this._updateServerStatus('stopped');
     }
   }
 
@@ -208,7 +289,7 @@ export class MarimoSidebar extends Widget {
       // Wait for the server to come back up
       await this._waitForServer();
     } catch {
-      this._updateServerStatus(false);
+      this._updateServerStatus('stopped');
     }
   }
 
@@ -217,15 +298,16 @@ export class MarimoSidebar extends Widget {
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      if (await this._isServerHealthy()) {
-        this._updateServerStatus(true);
+      const status = await this._checkHealth();
+      if (status.process_alive && status.marimo_healthy) {
+        this._updateServerStatus('running');
         await this._refreshSessions();
         return;
       }
     }
 
     // If we get here, the server didn't come back up
-    this._updateServerStatus(false);
+    this._updateServerStatus('stopped');
   }
 
   private _updateSessionsList(sessions: RunningSession[]): void {

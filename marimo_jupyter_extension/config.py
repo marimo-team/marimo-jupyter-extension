@@ -103,6 +103,7 @@ class MarimoProxyConfig(Configurable):
     ).tag(config=True)
 
     idle_timeout = Float(
+        default_value=None,
         allow_none=True,
         help=(
             "Minutes of no connection before shutting down the marimo server. "
@@ -111,6 +112,7 @@ class MarimoProxyConfig(Configurable):
     ).tag(config=True)
 
     session_ttl = Int(
+        default_value=None,
         allow_none=True,
         help=(
             "Seconds to wait before closing a session on websocket "
