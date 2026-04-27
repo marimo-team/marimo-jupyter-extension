@@ -85,14 +85,15 @@ export class MarimoSidebar extends Widget {
     }
   }
 
+  private _stateFromHealth(status: HealthStatus): ServerState {
+    if (status.process_alive && status.marimo_healthy) {
+      return 'running';
+    }
+    return status.process_alive ? 'unhealthy' : 'stopped';
+  }
+
   private async _refreshStatus(): Promise<void> {
-    const status = await this._checkHealth();
-    const state: ServerState =
-      status.process_alive && status.marimo_healthy
-        ? 'running'
-        : status.process_alive
-          ? 'unhealthy'
-          : 'stopped';
+    const state = this._stateFromHealth(await this._checkHealth());
 
     // Auto-start marimo on first load if it hasn't been started yet.
     // The health endpoint never triggers ensure_process(), so we do
@@ -153,9 +154,9 @@ export class MarimoSidebar extends Widget {
   }
 
   /**
-   * Check marimo health via the /marimo-tools/health endpoint, which
-   * checks process liveness before proxying to avoid the ensure_process()
-   * deadlock when the marimo process has exited.
+   * Poll marimo health via /marimo-tools/health. The handler reports
+   * proc liveness without ever triggering ensure_process(), so polling
+   * here will not spawn marimo when it is stopped.
    */
   private async _checkHealth(): Promise<HealthStatus> {
     const controller = new AbortController();
@@ -298,8 +299,7 @@ export class MarimoSidebar extends Widget {
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      const status = await this._checkHealth();
-      if (status.process_alive && status.marimo_healthy) {
+      if (this._stateFromHealth(await this._checkHealth()) === 'running') {
         this._updateServerStatus('running');
         await this._refreshSessions();
         return;

@@ -8,8 +8,11 @@ from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
 from tornado.httpclient import AsyncHTTPClient
+from tornado.ioloop import IOLoop
 
 from .convert import convert_notebook_to_marimo
+
+_WATCHER_POLL_INTERVAL = 1.0
 
 
 def _find_marimo_proxy_state(web_app):
@@ -115,12 +118,12 @@ class RestartHandler(JupyterHandler):
 
 
 class HealthHandler(JupyterHandler):
-    """Health check that avoids the jupyter-server-proxy deadlock.
+    """Sidebar-friendly health check that never triggers ensure_process().
 
-    When marimo has exited, polling /marimo/health through the proxy triggers
-    ensure_process() which hangs on the dead process. This handler checks
-    process liveness first (instant), cleans up stale state if dead, and only
-    proxies the health check to marimo when the process is alive.
+    Reports state without spawning. The proc watcher (started in
+    _load_jupyter_server_extension) keeps proxy_state['proc'] in sync
+    with reality, so a missing or non-running proc here means marimo is
+    really not running — no in-handler cleanup needed.
     """
 
     @web.authenticated
@@ -129,41 +132,14 @@ class HealthHandler(JupyterHandler):
 
         GET /marimo-tools/health
         Response: {"process_alive": bool, "marimo_healthy": bool}
-
-        This endpoint NEVER triggers ensure_process() — it only checks
-        existing state. Starting marimo is left to explicit user actions
-        (Start Server button, opening a notebook) which go through the
-        proxy directly.
         """
         proxy_state = _find_marimo_proxy_state(self.application)
+        proc = proxy_state.get("proc") if proxy_state else None
 
-        if not proxy_state:
-            self.finish({"process_alive": False, "marimo_healthy": False})
-            return
-
-        proc = proxy_state.get("proc")
-
-        # No process in state — either never started or previously cleaned up
-        if proc is None:
-            self.finish({"process_alive": False, "marimo_healthy": False})
-            return
-
-        # Process exists but has exited — clean up stale state so the next
-        # real request (notebook open, Start Server) spawns fresh instead
-        # of deadlocking in ensure_process()
         if not _is_process_alive(proc):
-            returncode = getattr(proc, "returncode", "unknown")
-            self.log.info(
-                "marimo process has exited (returncode: %s), "
-                "cleaning up proxy state",
-                returncode,
-            )
-            await _cleanup_proxy_state(proxy_state)
             self.finish({"process_alive": False, "marimo_healthy": False})
             return
 
-        # Process is alive — proxy the health check to marimo.
-        # ensure_process() is a no-op when proc is already in state.
         try:
             base_url = self.application.settings.get("base_url", "/")
             health_url = url_path_join(
@@ -172,24 +148,18 @@ class HealthHandler(JupyterHandler):
                 "marimo/health",
             )
 
-            # Forward jupyter auth (cookies + Authorization) so the internal
-            # request authenticates the same way the original did.
             forward_headers = {}
-            cookie = self.request.headers.get("Cookie", "")
-            if cookie:
-                forward_headers["Cookie"] = cookie
-            auth = self.request.headers.get("Authorization", "")
-            if auth:
-                forward_headers["Authorization"] = auth
+            for h in ("Cookie", "Authorization"):
+                v = self.request.headers.get(h, "")
+                if v:
+                    forward_headers[h] = v
 
-            http_client = AsyncHTTPClient()
-            response = await http_client.fetch(
+            response = await AsyncHTTPClient().fetch(
                 health_url,
                 request_timeout=10,
                 headers=forward_headers,
                 validate_cert=False,
             )
-
             data = json.loads(response.body)
             marimo_healthy = data.get("status") == "healthy"
 
@@ -209,32 +179,56 @@ class HealthHandler(JupyterHandler):
 
 def _is_process_alive(proc):
     """Check if a jupyter-server-proxy managed process is still running."""
-    if proc is None:
-        return False
-    if isinstance(proc, str):
-        # "process not managed by jupyter-server-proxy"
+    if proc is None or isinstance(proc, str):
         return False
     if hasattr(proc, "running"):
         return proc.running
     return True
 
 
-async def _cleanup_proxy_state(proxy_state):
-    """Remove stale proc from proxy state so next request spawns fresh.
+async def _proc_watcher_loop(server_app):
+    """Evict stale proc from jupyter-server-proxy state when marimo dies.
 
-    Uses a timeout to avoid blocking if proc_lock is already held by a
-    hung ensure_process() call.
+    The proxy caches a SupervisedProcess in proxy_state['proc']. When marimo
+    self-exits (e.g. idle --timeout) the cached handle outlives the process;
+    the next request hits ensure_process()'s cleanup path which awaits
+    proc.kill() on a reaped child and raises ProcessLookupError as a 500.
+
+    This loop watches each generation of proc, awaits its exit, and deletes
+    the entry under proc_lock. The next request then spawns a fresh process
+    instead of trying to kill a corpse.
     """
+    while True:
+        try:
+            proxy_state = _find_marimo_proxy_state(server_app.web_app)
+            proc = proxy_state.get("proc") if proxy_state else None
+            if (
+                proc is None
+                or isinstance(proc, str)
+                or not hasattr(proc, "proc")
+            ):
+                await asyncio.sleep(_WATCHER_POLL_INTERVAL)
+                continue
 
-    async def _do_cleanup():
-        async with proxy_state["proc_lock"]:
-            if "proc" in proxy_state:
-                del proxy_state["proc"]
+            try:
+                await proc.proc.wait()
+            except Exception:
+                pass
 
-    try:
-        await asyncio.wait_for(_do_cleanup(), timeout=5)
-    except (asyncio.TimeoutError, Exception):
-        pass
+            async with proxy_state["proc_lock"]:
+                if proxy_state.get("proc") is proc:
+                    rc = getattr(proc.proc, "returncode", "?")
+                    server_app.log.info(
+                        "marimo proc exited (rc=%s); evicting from "
+                        "jupyter-server-proxy state",
+                        rc,
+                    )
+                    del proxy_state["proc"]
+        except Exception as e:
+            server_app.log.warning(
+                "marimo proc watcher iteration failed: %s", e
+            )
+            await asyncio.sleep(_WATCHER_POLL_INTERVAL)
 
 
 class ConfigHandler(JupyterHandler):
@@ -339,4 +333,5 @@ def _load_jupyter_server_extension(server_app):
             (url_path_join(base_url, "marimo-tools/config"), ConfigHandler),
         ],
     )
+    IOLoop.current().spawn_callback(_proc_watcher_loop, server_app)
     server_app.log.info("marimo-jupyter-extension tools extension loaded")
