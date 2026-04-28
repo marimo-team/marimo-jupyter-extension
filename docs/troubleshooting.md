@@ -80,10 +80,10 @@ For JupyterHub, add the same line to `jupyterhub_config.py`.
 
 **Cause**: marimo version is too old.
 
-**Solution**: Upgrade to marimo 0.23.1 or newer:
+**Solution**: Upgrade to marimo 0.23.4 or newer:
 
 ```bash
-pip install 'marimo>=0.23.1'
+pip install 'marimo>=0.23.4'
 ```
 
 ### JupyterHub Issues
