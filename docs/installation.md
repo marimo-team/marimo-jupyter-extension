@@ -3,8 +3,7 @@
 ## Requirements
 
 - Python 3.10+
-- marimo >= 0.23.4 (earlier releases leak orphan kernel/LSP children when marimo is killed; see [marimo PR #9257](https://github.com/marimo-team/marimo/pull/9257))
-- jupyter-server-proxy (installed automatically)
+- marimo >= 0.23.4
 
 ## Basic Installation
 
