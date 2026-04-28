@@ -138,13 +138,13 @@ class HealthHandler(JupyterHandler):
                 if v:
                     forward_headers[h] = v
 
-            # Internal loopback to our own Jupyter server; cert validation
-            # off is intentional (self-signed dev certs, no external trust).
+            # follow_redirects=False prevents forwarded Cookie/Authorization
+            # leaking to a third party if the proxy target returns a 3xx.
             response = await AsyncHTTPClient().fetch(
                 health_url,
                 request_timeout=10,
                 headers=forward_headers,
-                validate_cert=False,
+                follow_redirects=False,
             )
             data = json.loads(response.body)
             marimo_healthy = data.get("status") == "healthy"
@@ -190,6 +190,14 @@ async def _proc_watcher_loop(server_app):
             ):
                 await asyncio.sleep(_WATCHER_POLL_INTERVAL)
                 continue
+
+            # Suppress simpervisor's auto-restart: on non-zero exit it
+            # would re-spawn into the proxy's still-cached port and
+            # collide with our fresh spawn loop. Real respawns must come
+            # from ensure_process() on a real request.
+            restart_future = getattr(proc, "_restart_process_future", None)
+            if restart_future is not None and not restart_future.done():
+                restart_future.cancel()
 
             try:
                 await proc.proc.wait()
