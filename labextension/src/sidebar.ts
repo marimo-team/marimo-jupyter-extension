@@ -190,13 +190,20 @@ export class MarimoSidebar extends Widget {
 
   /**
    * Hit the proxy directly to trigger ensure_process() and start marimo.
+   * Bounded by HEALTH_FETCH_TIMEOUT_MS so a hung proxy can't stall the UI.
    */
   private async _probeProxyHealth(): Promise<boolean> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      HEALTH_FETCH_TIMEOUT_MS,
+    );
     try {
       const baseUrl = this._getMarimoBaseUrl();
       const response = await fetch(`${baseUrl}health`, {
         method: 'GET',
         credentials: 'same-origin',
+        signal: controller.signal,
       });
       if (response.ok) {
         const data = (await response.json()) as { status: string };
@@ -205,6 +212,8 @@ export class MarimoSidebar extends Widget {
       return false;
     } catch {
       return false;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
