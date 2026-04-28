@@ -135,6 +135,30 @@
   font-size: 11px;
 }
 
+/* Info section */
+.jp-MarimoSidebar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.jp-MarimoSidebar-infoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.jp-MarimoSidebar-infoLabel {
+  color: var(--jp-ui-font-color2);
+}
+
+.jp-MarimoSidebar-infoValue {
+  color: var(--jp-ui-font-color0);
+  font-family: var(--jp-code-font-family);
+  font-size: 11px;
+}
+
 /* Running Sessions section */
 .jp-MarimoSidebar-sectionTitleRow {
   display: flex;
