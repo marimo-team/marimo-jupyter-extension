@@ -110,7 +110,9 @@ class TestFindMarimoProxyState:
     def _modern_web_app(self, inner_rules):
         target = SimpleNamespace(rules=inner_rules)
         host_rule = SimpleNamespace(target=target)
-        return SimpleNamespace(default_router=SimpleNamespace(rules=[host_rule]))
+        return SimpleNamespace(
+            default_router=SimpleNamespace(rules=[host_rule])
+        )
 
     def _legacy_spec(self, pattern, kwargs):
         spec = SimpleNamespace()
@@ -137,9 +139,7 @@ class TestFindMarimoProxyState:
             _find_marimo_proxy_state,
         )
 
-        web_app = self._modern_web_app(
-            [self._modern_rule(r"^/marimo/", {})]
-        )
+        web_app = self._modern_web_app([self._modern_rule(r"^/marimo/", {})])
         assert _find_marimo_proxy_state(web_app) is None
 
     def test_legacy_handlers_returns_marimo_state(self):
@@ -152,7 +152,10 @@ class TestFindMarimoProxyState:
         web_app = SimpleNamespace(
             handlers=[
                 (".*", [self._legacy_spec(r"^/other", {"state": {"x": 1}})]),
-                (".*", [self._legacy_spec(r"^/marimo/", {"state": marimo_state})]),
+                (
+                    ".*",
+                    [self._legacy_spec(r"^/marimo/", {"state": marimo_state})],
+                ),
             ]
         )
         assert _find_marimo_proxy_state(web_app) is marimo_state
