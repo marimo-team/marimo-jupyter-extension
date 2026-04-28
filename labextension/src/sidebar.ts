@@ -36,6 +36,7 @@ export class MarimoSidebar extends Widget {
   private _serverControlsContainer: HTMLElement | null = null;
   private _startServerContainer: HTMLElement | null = null;
   private _hasAutoStarted = false;
+  private _refreshInFlight = false;
 
   constructor(commands: CommandRegistry) {
     super();
@@ -93,22 +94,29 @@ export class MarimoSidebar extends Widget {
   }
 
   private async _refreshStatus(): Promise<void> {
-    const state = this._stateFromHealth(await this._checkHealth());
-
-    // Auto-start marimo on first load if it hasn't been started yet.
-    // The health endpoint never triggers ensure_process(), so we do
-    // a one-time probe through the proxy to kick off the process.
-    if (state === 'stopped' && !this._hasAutoStarted) {
-      this._hasAutoStarted = true;
-      this._startServer();
+    if (this._refreshInFlight) {
       return;
     }
+    this._refreshInFlight = true;
+    try {
+      const state = this._stateFromHealth(await this._checkHealth());
 
-    this._updateServerStatus(state);
-    if (state === 'running') {
-      await this._refreshSessions();
-    } else {
-      this._updateSessionsList([]);
+      // Auto-start marimo on first load. /marimo-tools/health never
+      // spawns, so we kick the proxy via /marimo/health below.
+      if (state === 'stopped' && !this._hasAutoStarted) {
+        this._hasAutoStarted = true;
+        this._startServer();
+        return;
+      }
+
+      this._updateServerStatus(state);
+      if (state === 'running') {
+        await this._refreshSessions();
+      } else {
+        this._updateSessionsList([]);
+      }
+    } finally {
+      this._refreshInFlight = false;
     }
   }
 
@@ -154,9 +162,7 @@ export class MarimoSidebar extends Widget {
   }
 
   /**
-   * Poll marimo health via /marimo-tools/health. The handler reports
-   * proc liveness without ever triggering ensure_process(), so polling
-   * here will not spawn marimo when it is stopped.
+   * Poll marimo liveness without ever spawning it.
    */
   private async _checkHealth(): Promise<HealthStatus> {
     const controller = new AbortController();
@@ -183,9 +189,7 @@ export class MarimoSidebar extends Widget {
   }
 
   /**
-   * Trigger the proxy to start marimo by hitting /marimo/health directly.
-   * This is used only during explicit "Start Server" — it intentionally
-   * goes through jupyter-server-proxy to trigger ensure_process().
+   * Hit the proxy directly to trigger ensure_process() and start marimo.
    */
   private async _probeProxyHealth(): Promise<boolean> {
     try {
@@ -306,7 +310,6 @@ export class MarimoSidebar extends Widget {
       }
     }
 
-    // If we get here, the server didn't come back up
     this._updateServerStatus('stopped');
   }
 

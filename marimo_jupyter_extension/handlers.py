@@ -16,12 +16,7 @@ _WATCHER_POLL_INTERVAL = 1.0
 
 
 def _find_marimo_proxy_state(web_app):
-    """Find the marimo proxy handler's state dict.
-
-    Searches through the web_app's registered handlers to find the
-    jupyter-server-proxy handler for marimo and returns its state dict.
-    Supports both legacy tornado (<6) .handlers and modern (.default_router).
-    """
+    """Return the jupyter-server-proxy state dict for the marimo route."""
     # Modern tornado (6.x+): handlers are in default_router.rules.
     # Each Rule stores its handler kwargs as `target_kwargs`.
     if hasattr(web_app, "default_router"):
@@ -118,21 +113,10 @@ class RestartHandler(JupyterHandler):
 
 
 class HealthHandler(JupyterHandler):
-    """Sidebar-friendly health check that never triggers ensure_process().
-
-    Reports state without spawning. The proc watcher (started in
-    _load_jupyter_server_extension) keeps proxy_state['proc'] in sync
-    with reality, so a missing or non-running proc here means marimo is
-    really not running — no in-handler cleanup needed.
-    """
+    """Liveness probe used by the sidebar; never spawns marimo."""
 
     @web.authenticated
     async def get(self):
-        """Check marimo server health.
-
-        GET /marimo-tools/health
-        Response: {"process_alive": bool, "marimo_healthy": bool}
-        """
         proxy_state = _find_marimo_proxy_state(self.application)
         proc = proxy_state.get("proc") if proxy_state else None
 
@@ -154,6 +138,8 @@ class HealthHandler(JupyterHandler):
                 if v:
                     forward_headers[h] = v
 
+            # Internal loopback to our own Jupyter server; cert validation
+            # off is intentional (self-signed dev certs, no external trust).
             response = await AsyncHTTPClient().fetch(
                 health_url,
                 request_timeout=10,
@@ -189,14 +175,9 @@ def _is_process_alive(proc):
 async def _proc_watcher_loop(server_app):
     """Evict stale proc from jupyter-server-proxy state when marimo dies.
 
-    The proxy caches a SupervisedProcess in proxy_state['proc']. When marimo
-    self-exits (e.g. idle --timeout) the cached handle outlives the process;
-    the next request hits ensure_process()'s cleanup path which awaits
-    proc.kill() on a reaped child and raises ProcessLookupError as a 500.
-
-    This loop watches each generation of proc, awaits its exit, and deletes
-    the entry under proc_lock. The next request then spawns a fresh process
-    instead of trying to kill a corpse.
+    Without this, a self-exited marimo leaves a cached SupervisedProcess
+    behind; the next request's ensure_process() cleanup awaits kill() on
+    a reaped child and raises ProcessLookupError as a 500.
     """
     while True:
         try:
