@@ -6,6 +6,8 @@ import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _make_handler(handler_cls, *, application=None):
     """Build a handler instance bypassing Tornado's initializer."""
@@ -14,6 +16,10 @@ def _make_handler(handler_cls, *, application=None):
     handler.current_user = "u"
     handler.set_status = MagicMock()
     handler.finish = MagicMock()
+    # Bypass XSRF: real validation needs a fully-initialized Tornado
+    # request, which these unit tests deliberately skip. Per-test
+    # overrides can swap this for a side-effect to exercise rejection.
+    handler.check_xsrf_cookie = MagicMock()
     return handler
 
 
@@ -250,6 +256,22 @@ class TestHealthHandler:
         handler.finish.assert_called_once_with(
             {"process_alive": False, "marimo_healthy": False}
         )
+
+    def test_raises_when_xsrf_check_fails(self):
+        """A CSRF-rejected probe must propagate as 403, not silently
+        succeed and forward credentials to /marimo/health."""
+        from tornado.web import HTTPError
+
+        from marimo_jupyter_extension.handlers import HealthHandler
+
+        handler = _make_handler(HealthHandler, application=SimpleNamespace())
+        handler.check_xsrf_cookie = MagicMock(
+            side_effect=HTTPError(403, "XSRF cookie does not match")
+        )
+        with pytest.raises(HTTPError) as exc_info:
+            _run(handler, "get")
+        assert exc_info.value.status_code == 403
+        handler.finish.assert_not_called()
 
 
 class TestLoadServerExtension:

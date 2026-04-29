@@ -1,4 +1,5 @@
 import { PageConfig } from '@jupyterlab/coreutils';
+import { ServerConnection } from '@jupyterlab/services';
 import type { CommandRegistry } from '@lumino/commands';
 import type { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
@@ -23,6 +24,22 @@ interface HealthStatus {
 }
 
 type ServerState = 'running' | 'unhealthy' | 'stopped';
+
+/**
+ * Issue a request to a Jupyter server endpoint with the credentials and
+ * XSRF header that ServerConnection sets up automatically.
+ */
+function requestWithSettings(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const settings = ServerConnection.makeSettings();
+  return ServerConnection.makeRequest(
+    `${settings.baseUrl}${path}`,
+    init,
+    settings,
+  );
+}
 
 /**
  * A sidebar panel for marimo quick actions.
@@ -171,10 +188,8 @@ export class MarimoSidebar extends Widget {
       HEALTH_FETCH_TIMEOUT_MS,
     );
     try {
-      const baseUrl = PageConfig.getBaseUrl();
-      const response = await fetch(`${baseUrl}marimo-tools/health`, {
+      const response = await requestWithSettings('marimo-tools/health', {
         method: 'GET',
-        credentials: 'same-origin',
         signal: controller.signal,
       });
       if (response.ok) {
@@ -289,11 +304,9 @@ export class MarimoSidebar extends Widget {
     this._updateSessionsList([]);
 
     try {
-      const baseUrl = PageConfig.getBaseUrl();
       // Call the restart endpoint which properly manages the proxy state
-      const response = await fetch(`${baseUrl}marimo-tools/restart`, {
+      const response = await requestWithSettings('marimo-tools/restart', {
         method: 'POST',
-        credentials: 'same-origin',
       });
 
       if (!response.ok) {

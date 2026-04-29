@@ -56,10 +56,11 @@ if [ "$CURRENT_VERSION" = "$NEW_VERSION" ]; then
   exit 0
 fi
 
-# Target files containing marimo version references
+# Target files containing marimo version references.
+# executable.py is the canonical source (MARIMO_VERSION constant);
+# the rest are documentation that mirrors the literal.
 FILES=(
   "marimo_jupyter_extension/executable.py"
-  "marimo_jupyter_extension/handlers.py"
   "README.md"
   "docs/installation.md"
   "docs/index.md"
