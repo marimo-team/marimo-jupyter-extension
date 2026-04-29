@@ -518,6 +518,40 @@ export class MarimoSidebar extends Widget {
     `;
     content.appendChild(helpSection);
 
+    // Info section
+    const infoSection = document.createElement('div');
+    infoSection.className = 'jp-MarimoSidebar-section';
+
+    const infoTitle = document.createElement('div');
+    infoTitle.className = 'jp-MarimoSidebar-sectionTitle';
+    infoTitle.textContent = 'Info';
+    infoSection.appendChild(infoTitle);
+
+    const infoContainer = document.createElement('div');
+    infoContainer.className = 'jp-MarimoSidebar-info';
+
+    const marimoVersion = PageConfig.getOption('marimoVersion');
+    const extensionVersion = PageConfig.getOption('marimoExtensionVersion');
+    const rows: readonly (readonly [string, string])[] = [
+      ['marimo', marimoVersion || 'unknown'],
+      ['extension', extensionVersion || 'unknown'],
+    ];
+    for (const [label, value] of rows) {
+      const row = document.createElement('div');
+      row.className = 'jp-MarimoSidebar-infoRow';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'jp-MarimoSidebar-infoLabel';
+      labelEl.textContent = label;
+      const valueEl = document.createElement('span');
+      valueEl.className = 'jp-MarimoSidebar-infoValue';
+      valueEl.textContent = value;
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      infoContainer.appendChild(row);
+    }
+    infoSection.appendChild(infoContainer);
+    content.appendChild(infoSection);
+
     this.node.appendChild(content);
   }
 }

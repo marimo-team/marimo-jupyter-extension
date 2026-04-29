@@ -10,6 +10,7 @@ from tornado import web
 from tornado.httpclient import AsyncHTTPClient
 from tornado.ioloop import IOLoop
 
+from . import version_info
 from .convert import convert_notebook_to_marimo
 from .executable import MARIMO_VERSION
 
@@ -289,12 +290,16 @@ class CreateStubHandler(JupyterHandler):
                 ]
             )
 
-        # Add marimo app boilerplate
+        # Add marimo app boilerplate. Prefer the running marimo's
+        # version so the stub matches what will read it; fall back to
+        # the floor MARIMO_VERSION when marimo can't be queried (e.g.
+        # uvx mode with no marimo in the Jupyter env).
+        marimo_version = version_info.get_marimo_version() or MARIMO_VERSION
         lines.extend(
             [
                 "import marimo",
                 "",
-                f'__generated_with = "{MARIMO_VERSION}"',
+                f'__generated_with = "{marimo_version}"',
                 'app = marimo.App(width="medium")',
                 "",
                 "",
@@ -322,6 +327,8 @@ def _jupyter_server_extension_points():
 
 def _load_jupyter_server_extension(server_app):
     """Load the jupyter server extension."""
+    from . import __version__
+
     base_url = server_app.web_app.settings["base_url"]
     server_app.web_app.add_handlers(
         ".*",
@@ -337,4 +344,11 @@ def _load_jupyter_server_extension(server_app):
         ],
     )
     IOLoop.current().spawn_callback(_proc_watcher_loop, server_app)
+
+    page_config = server_app.web_app.settings.setdefault(
+        "page_config_data", {}
+    )
+    page_config["marimoExtensionVersion"] = __version__
+    page_config["marimoVersion"] = version_info.get_marimo_version() or ""
+
     server_app.log.info("marimo-jupyter-extension tools extension loaded")
