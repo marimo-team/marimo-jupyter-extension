@@ -26,6 +26,22 @@ interface HealthStatus {
 type ServerState = 'running' | 'unhealthy' | 'stopped';
 
 /**
+ * Issue a request to a Jupyter server endpoint with the credentials and
+ * XSRF header that ServerConnection sets up automatically.
+ */
+function requestWithSettings(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const settings = ServerConnection.makeSettings();
+  return ServerConnection.makeRequest(
+    `${settings.baseUrl}${path}`,
+    init,
+    settings,
+  );
+}
+
+/**
  * A sidebar panel for marimo quick actions.
  */
 export class MarimoSidebar extends Widget {
@@ -172,12 +188,10 @@ export class MarimoSidebar extends Widget {
       HEALTH_FETCH_TIMEOUT_MS,
     );
     try {
-      const settings = ServerConnection.makeSettings();
-      const response = await ServerConnection.makeRequest(
-        `${settings.baseUrl}marimo-tools/health`,
-        { method: 'GET', signal: controller.signal },
-        settings,
-      );
+      const response = await requestWithSettings('marimo-tools/health', {
+        method: 'GET',
+        signal: controller.signal,
+      });
       if (response.ok) {
         return (await response.json()) as HealthStatus;
       }
@@ -290,13 +304,10 @@ export class MarimoSidebar extends Widget {
     this._updateSessionsList([]);
 
     try {
-      const settings = ServerConnection.makeSettings();
       // Call the restart endpoint which properly manages the proxy state
-      const response = await ServerConnection.makeRequest(
-        `${settings.baseUrl}marimo-tools/restart`,
-        { method: 'POST' },
-        settings,
-      );
+      const response = await requestWithSettings('marimo-tools/restart', {
+        method: 'POST',
+      });
 
       if (!response.ok) {
         throw new Error('Restart request failed');

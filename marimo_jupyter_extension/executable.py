@@ -5,6 +5,10 @@ from pathlib import Path
 
 from .config import Config
 
+# Single source of truth for the marimo version this extension targets.
+# scripts/bump-marimo.sh updates this literal alongside the README docs.
+MARIMO_VERSION = "0.23.4"
+
 COMMON_LOCATIONS = [
     "~/.local/bin/marimo",
     "/opt/bin/marimo",
@@ -29,7 +33,7 @@ def get_marimo_command(config: Config) -> list[str]:
     """
     # uvx mode (opt-in via explicit uvx_path)
     if config.uvx_path:
-        return [config.uvx_path, "marimo[sandbox]>=0.23.4"]
+        return [config.uvx_path, f"marimo[sandbox]>={MARIMO_VERSION}"]
 
     # Explicit marimo path
     if config.marimo_path:

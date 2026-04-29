@@ -11,6 +11,7 @@ from tornado.httpclient import AsyncHTTPClient
 from tornado.ioloop import IOLoop
 
 from .convert import convert_notebook_to_marimo
+from .executable import MARIMO_VERSION
 
 _WATCHER_POLL_INTERVAL = 1.0
 
@@ -293,7 +294,7 @@ class CreateStubHandler(JupyterHandler):
             [
                 "import marimo",
                 "",
-                '__generated_with = "0.23.4"',
+                f'__generated_with = "{MARIMO_VERSION}"',
                 'app = marimo.App(width="medium")',
                 "",
                 "",
