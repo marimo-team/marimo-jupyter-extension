@@ -308,6 +308,9 @@ def _jupyter_server_extension_points():
 
 def _load_jupyter_server_extension(server_app):
     """Load the jupyter server extension."""
+    from . import __version__
+    from .version_info import get_marimo_version
+
     base_url = server_app.web_app.settings["base_url"]
     server_app.web_app.add_handlers(
         ".*",
@@ -323,4 +326,11 @@ def _load_jupyter_server_extension(server_app):
         ],
     )
     IOLoop.current().spawn_callback(_proc_watcher_loop, server_app)
+
+    page_config = server_app.web_app.settings.setdefault(
+        "page_config_data", {}
+    )
+    page_config["marimoExtensionVersion"] = __version__
+    page_config["marimoVersion"] = get_marimo_version() or ""
+
     server_app.log.info("marimo-jupyter-extension tools extension loaded")

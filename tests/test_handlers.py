@@ -4,7 +4,7 @@ import asyncio
 import json
 import re
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def _make_handler(handler_cls, *, application=None):
@@ -250,3 +250,63 @@ class TestHealthHandler:
         handler.finish.assert_called_once_with(
             {"process_alive": False, "marimo_healthy": False}
         )
+
+
+class TestLoadServerExtension:
+    """Test suite for _load_jupyter_server_extension."""
+
+    def _make_server_app(self):
+        server_app = MagicMock()
+        server_app.web_app.settings = {"base_url": "/"}
+        return server_app
+
+    def test_populates_version_keys_when_marimo_installed(self):
+        from marimo_jupyter_extension.handlers import (
+            _load_jupyter_server_extension,
+        )
+
+        server_app = self._make_server_app()
+        with patch(
+            "marimo_jupyter_extension.version_info.get_marimo_version",
+            return_value="0.23.1",
+        ):
+            _load_jupyter_server_extension(server_app)
+
+        page_config = server_app.web_app.settings["page_config_data"]
+        assert page_config["marimoVersion"] == "0.23.1"
+        assert page_config["marimoExtensionVersion"]
+        server_app.web_app.add_handlers.assert_called_once()
+        server_app.log.info.assert_called_once()
+
+    def test_marimo_version_falls_back_to_empty_string(self):
+        from marimo_jupyter_extension.handlers import (
+            _load_jupyter_server_extension,
+        )
+
+        server_app = self._make_server_app()
+        with patch(
+            "marimo_jupyter_extension.version_info.get_marimo_version",
+            return_value=None,
+        ):
+            _load_jupyter_server_extension(server_app)
+
+        page_config = server_app.web_app.settings["page_config_data"]
+        assert page_config["marimoVersion"] == ""
+        assert page_config["marimoExtensionVersion"]
+
+    def test_preserves_existing_page_config_data(self):
+        from marimo_jupyter_extension.handlers import (
+            _load_jupyter_server_extension,
+        )
+
+        server_app = self._make_server_app()
+        server_app.web_app.settings["page_config_data"] = {"existing": "value"}
+        with patch(
+            "marimo_jupyter_extension.version_info.get_marimo_version",
+            return_value="0.23.1",
+        ):
+            _load_jupyter_server_extension(server_app)
+
+        page_config = server_app.web_app.settings["page_config_data"]
+        assert page_config["existing"] == "value"
+        assert page_config["marimoVersion"] == "0.23.1"
