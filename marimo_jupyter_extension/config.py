@@ -5,6 +5,7 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 
+from jupyter_server.utils import url_path_join
 from traitlets import Bool, Float, Int, List, Unicode, default
 from traitlets.config import Configurable
 
@@ -194,4 +195,4 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
 def _get_base_url() -> str:
     """Get base URL, gracefully handling non-JupyterHub environments."""
     prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
-    return f"{prefix}marimo"
+    return url_path_join(prefix, "marimo")

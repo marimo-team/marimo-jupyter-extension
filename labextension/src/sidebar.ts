@@ -1,4 +1,5 @@
 import { PageConfig } from '@jupyterlab/coreutils';
+import { ServerConnection } from '@jupyterlab/services';
 import type { CommandRegistry } from '@lumino/commands';
 import type { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
@@ -171,12 +172,12 @@ export class MarimoSidebar extends Widget {
       HEALTH_FETCH_TIMEOUT_MS,
     );
     try {
-      const baseUrl = PageConfig.getBaseUrl();
-      const response = await fetch(`${baseUrl}marimo-tools/health`, {
-        method: 'GET',
-        credentials: 'same-origin',
-        signal: controller.signal,
-      });
+      const settings = ServerConnection.makeSettings();
+      const response = await ServerConnection.makeRequest(
+        `${settings.baseUrl}marimo-tools/health`,
+        { method: 'GET', signal: controller.signal },
+        settings,
+      );
       if (response.ok) {
         return (await response.json()) as HealthStatus;
       }
@@ -289,12 +290,13 @@ export class MarimoSidebar extends Widget {
     this._updateSessionsList([]);
 
     try {
-      const baseUrl = PageConfig.getBaseUrl();
+      const settings = ServerConnection.makeSettings();
       // Call the restart endpoint which properly manages the proxy state
-      const response = await fetch(`${baseUrl}marimo-tools/restart`, {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
+      const response = await ServerConnection.makeRequest(
+        `${settings.baseUrl}marimo-tools/restart`,
+        { method: 'POST' },
+        settings,
+      );
 
       if (!response.ok) {
         throw new Error('Restart request failed');

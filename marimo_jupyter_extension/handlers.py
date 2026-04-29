@@ -117,6 +117,14 @@ class HealthHandler(JupyterHandler):
 
     @web.authenticated
     async def get(self):
+        # GET handlers are conventionally exempt from XSRF, but this
+        # endpoint forwards the caller's Cookie + Authorization onward
+        # to /marimo/health, so explicitly validate the inbound token
+        # to keep cross-origin pages from triggering a credentialed
+        # proxy probe. JupyterHandler.prepare() only auto-checks XSRF
+        # for non-GET methods, so the call is needed here.
+        self.check_xsrf_cookie()
+
         proxy_state = _find_marimo_proxy_state(self.application)
         proc = proxy_state.get("proc") if proxy_state else None
 
@@ -133,7 +141,7 @@ class HealthHandler(JupyterHandler):
             )
 
             forward_headers = {}
-            for h in ("Cookie", "Authorization"):
+            for h in ("Cookie", "Authorization", "X-Xsrftoken"):
                 v = self.request.headers.get(h, "")
                 if v:
                     forward_headers[h] = v
@@ -195,6 +203,11 @@ async def _proc_watcher_loop(server_app):
             # would re-spawn into the proxy's still-cached port and
             # collide with our fresh spawn loop. Real respawns must come
             # from ensure_process() on a real request.
+            #
+            # Private attribute because simpervisor has no public API
+            # to disable auto-restart yet — tracked in
+            # https://github.com/jupyterhub/simpervisor/pull/73. Switch
+            # to the public API once it lands and we bump the floor.
             restart_future = getattr(proc, "_restart_process_future", None)
             if restart_future is not None and not restart_future.done():
                 restart_future.cancel()
@@ -280,7 +293,7 @@ class CreateStubHandler(JupyterHandler):
             [
                 "import marimo",
                 "",
-                '__generated_with = "0.23.1"',
+                '__generated_with = "0.23.4"',
                 'app = marimo.App(width="medium")',
                 "",
                 "",
