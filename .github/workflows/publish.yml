@@ -20,12 +20,12 @@ jobs:
           python-version: '3.14'
 
       - name: Set up Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
 
       - name: Install pnpm
-        uses: pnpm/action-setup@71c92474e7e4f5bca283fb17ef80fba9cdb2b4b1 # v6
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6
         with:
           version: 10
 
@@ -67,7 +67,7 @@ jobs:
 
       - name: Notify release result
         if: always()
-        uses: marimo-team/internal-gh-actions/release-notification@ba06d4db1f3c5c9b86983ce409e57196f8376777 # main
+        uses: marimo-team/internal-gh-actions/release-notification@91f15bebd3f322db6717ba5a17983928a47ec991 # main
         with:
           status: ${{ job.status }}
           slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL_RELEASES }}
