@@ -59,7 +59,7 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@jupyterlab/builder": "4.5.7",
-    "@types/node": "24.12.2",
+    "@types/node": "24.12.3",
     "@typescript-eslint/eslint-plugin": "8.58.2",
     "@typescript-eslint/parser": "8.58.2",
     "eslint": "8.57.1",
