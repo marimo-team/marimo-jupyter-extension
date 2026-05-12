@@ -27,7 +27,7 @@ jobs:
           package_json_file: labextension/package.json
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --ignore-scripts --frozen-lockfile
 
       - name: Run tests
         run: pnpm run test

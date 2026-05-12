@@ -35,7 +35,7 @@ jobs:
       - name: Build labextension
         run: |
           cd labextension
-          pnpm install
+          pnpm install --ignore-scripts
           pnpm run build:prod
 
       - name: Build package
