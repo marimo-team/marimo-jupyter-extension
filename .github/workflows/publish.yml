@@ -27,7 +27,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6
         with:
-          version: 10
+          package_json_file: labextension/package.json
 
       - name: Install build tools
         run: pip install build hatch hatch-jupyter-builder
