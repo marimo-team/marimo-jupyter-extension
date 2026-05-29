@@ -78,15 +78,15 @@ For JupyterHub, add the same line to `jupyterhub_config.py`.
 
 ### Large cell outputs hang or never render
 
-Marimo's `runtime.output_max_bytes` (default 8 MB) controls truncation; tornado's websocket cap (default 10 MiB) controls what the proxy will forward. Big plotly figures or DataFrames exceed 10 MiB and get dropped silently — the cell shows no output and hangs.
+Two caps in series: marimo's `runtime.output_max_bytes` (default 8 MB) and tornado's websocket frame cap (default 10 MiB). Big plotly figures or DataFrames blow past 10 MiB and get dropped silently — the cell just hangs.
 
-This extension defaults the proxy cap to 256 MiB. To go higher, **also** raise marimo's `output_max_bytes` (PEP 723 script header, `~/.config/marimo/marimo.toml`, or `MARIMO_OUTPUT_MAX_BYTES` — on JupyterHub the env var must be in `c.Spawner.environment`). Then tune the proxy cap:
+Raise marimo's side via PEP 723 script header, `~/.config/marimo/marimo.toml`, or `MARIMO_OUTPUT_MAX_BYTES` (on JupyterHub set it in `c.Spawner.environment`). Raise tornado's side via:
 
 ```python
-c.MarimoProxyConfig.websocket_max_message_size = 512 * 1024 * 1024
+c.ServerApp.tornado_settings = {"websocket_max_message_size": 256 * 1024 * 1024}
 ```
 
-Run `marimo config show` in a terminal to verify marimo's effective config.
+Run `marimo config show` in a JupyterHub terminal to verify marimo's effective config.
 
 ### Error: "No such option: --base-url"
 
