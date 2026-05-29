@@ -76,6 +76,18 @@ For JupyterHub, add the same line to `jupyterhub_config.py`.
 
 **Solution**: Use the [Standalone JupyterLab](configuration.md#standalone-jupyterlab) configuration approach instead — either a CLI flag or `jupyter_server_config.py`.
 
+### Large cell outputs hang or never render
+
+Two caps in series: marimo's `runtime.output_max_bytes` (default 8 MB) and tornado's websocket frame cap (default 10 MiB). Big plotly figures or DataFrames blow past 10 MiB and get dropped silently — the cell just hangs.
+
+Raise marimo's side via PEP 723 script header, `~/.config/marimo/marimo.toml`, or `MARIMO_OUTPUT_MAX_BYTES` (on JupyterHub set it in `c.Spawner.environment`). Raise tornado's side via:
+
+```python
+c.ServerApp.tornado_settings = {"websocket_max_message_size": 256 * 1024 * 1024}
+```
+
+Run `marimo config show` in a JupyterHub terminal to verify marimo's effective config.
+
 ### Error: "No such option: --base-url"
 
 **Cause**: marimo version is too old.
