@@ -20,7 +20,6 @@ interface RunningSession {
 
 interface HealthStatus {
   process_alive: boolean;
-  marimo_healthy: boolean;
 }
 
 type ServerState = 'running' | 'unhealthy' | 'stopped';
@@ -103,11 +102,18 @@ export class MarimoSidebar extends Widget {
     }
   }
 
-  private _stateFromHealth(status: HealthStatus): ServerState {
-    if (status.process_alive && status.marimo_healthy) {
-      return 'running';
+  /**
+   * Combine server-side process state with a client-side reachability
+   * probe. The client probe takes the same path as the iframe, so the
+   * indicator stays consistent with what the user actually sees — see
+   * #95 for why a server-side HTTP probe can't.
+   */
+  private async _resolveServerState(): Promise<ServerState> {
+    const { process_alive } = await this._checkHealth();
+    if (!process_alive) {
+      return 'stopped';
     }
-    return status.process_alive ? 'unhealthy' : 'stopped';
+    return (await this._probeProxyHealth()) ? 'running' : 'unhealthy';
   }
 
   private async _refreshStatus(): Promise<void> {
@@ -116,7 +122,7 @@ export class MarimoSidebar extends Widget {
     }
     this._refreshInFlight = true;
     try {
-      const state = this._stateFromHealth(await this._checkHealth());
+      const state = await this._resolveServerState();
 
       // Auto-start marimo on first load. /marimo-tools/health never
       // spawns, so we kick the proxy via /marimo/health below.
@@ -195,9 +201,9 @@ export class MarimoSidebar extends Widget {
       if (response.ok) {
         return (await response.json()) as HealthStatus;
       }
-      return { process_alive: false, marimo_healthy: false };
+      return { process_alive: false };
     } catch {
-      return { process_alive: false, marimo_healthy: false };
+      return { process_alive: false };
     } finally {
       clearTimeout(timeoutId);
     }
@@ -325,7 +331,7 @@ export class MarimoSidebar extends Widget {
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      if (this._stateFromHealth(await this._checkHealth()) === 'running') {
+      if ((await this._resolveServerState()) === 'running') {
         this._updateServerStatus('running');
         await this._refreshSessions();
         return;

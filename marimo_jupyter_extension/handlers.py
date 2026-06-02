@@ -7,7 +7,6 @@ from pathlib import Path
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
-from tornado.httpclient import AsyncHTTPClient
 from tornado.ioloop import IOLoop
 
 from . import version_info
@@ -115,62 +114,20 @@ class RestartHandler(JupyterHandler):
 
 
 class HealthHandler(JupyterHandler):
-    """Liveness probe used by the sidebar; never spawns marimo."""
+    """Process liveness probe used by the sidebar; never spawns marimo.
+
+    Only reports whether jupyter-server-proxy's SupervisedProcess is
+    running. Server-reachability is checked client-side from the sidebar
+    so the probe path matches the iframe's path (see #95 — a server-side
+    HTTP probe via self.request.host gets bounced by oauth2 redirects
+    on reverse-proxy setups even when marimo is fully reachable).
+    """
 
     @web.authenticated
     async def get(self):
-        # GET handlers are conventionally exempt from XSRF, but this
-        # endpoint forwards the caller's Cookie + Authorization onward
-        # to /marimo/health, so explicitly validate the inbound token
-        # to keep cross-origin pages from triggering a credentialed
-        # proxy probe. JupyterHandler.prepare() only auto-checks XSRF
-        # for non-GET methods, so the call is needed here.
-        self.check_xsrf_cookie()
-
         proxy_state = _find_marimo_proxy_state(self.application)
         proc = proxy_state.get("proc") if proxy_state else None
-
-        if not _is_process_alive(proc):
-            self.finish({"process_alive": False, "marimo_healthy": False})
-            return
-
-        try:
-            base_url = self.application.settings.get("base_url", "/")
-            health_url = url_path_join(
-                f"{self.request.protocol}://{self.request.host}",
-                base_url,
-                "marimo/health",
-            )
-
-            forward_headers = {}
-            for h in ("Cookie", "Authorization", "X-Xsrftoken"):
-                v = self.request.headers.get(h, "")
-                if v:
-                    forward_headers[h] = v
-
-            # follow_redirects=False prevents forwarded Cookie/Authorization
-            # leaking to a third party if the proxy target returns a 3xx.
-            response = await AsyncHTTPClient().fetch(
-                health_url,
-                request_timeout=10,
-                headers=forward_headers,
-                follow_redirects=False,
-            )
-            data = json.loads(response.body)
-            marimo_healthy = data.get("status") == "healthy"
-
-            if not marimo_healthy:
-                self.log.warning(
-                    "marimo process is running but health check returned: %s",
-                    response.body.decode(),
-                )
-
-            self.finish(
-                {"process_alive": True, "marimo_healthy": marimo_healthy}
-            )
-        except Exception as e:
-            self.log.warning("marimo health check failed: %s", e)
-            self.finish({"process_alive": True, "marimo_healthy": False})
+        self.finish({"process_alive": _is_process_alive(proc)})
 
 
 def _is_process_alive(proc):
