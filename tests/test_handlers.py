@@ -6,8 +6,6 @@ import re
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 def _make_handler(handler_cls, *, application=None):
     """Build a handler instance bypassing Tornado's initializer."""
