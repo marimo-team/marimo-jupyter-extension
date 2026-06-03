@@ -114,6 +114,23 @@ class TestMarimoProxyConfig:
 
         assert config.no_sandbox is False
 
+    def test_default_file_is_none(self, clean_env):
+        """Default default_file should be None."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        assert config.default_file is None
+
+    def test_default_file_can_be_set(self, clean_env):
+        """default_file should accept a string path."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+        config.default_file = "/etc/marimo/template.py"
+
+        assert config.default_file == "/etc/marimo/template.py"
+
 
 class TestGetConfig:
     """Test suite for get_config() function."""

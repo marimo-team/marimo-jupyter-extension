@@ -3,6 +3,8 @@
 import asyncio
 import json
 import re
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -248,6 +250,172 @@ class TestHealthHandler:
         handler.finish.assert_called_once_with({"process_alive": False})
 
 
+class TestCreateStubHandler:
+    """`CreateStubHandler.post` writes a marimo notebook stub to disk.
+
+    When `c.MarimoProxyConfig.default_file` is configured, the cached
+    template content (stored on web_app.settings by
+    _load_jupyter_server_extension) is written verbatim; otherwise the
+    handler emits the built-in boilerplate.
+    """
+
+    def _build(self, body, settings=None):
+        from marimo_jupyter_extension.handlers import CreateStubHandler
+
+        app = SimpleNamespace(settings=settings or {})
+        handler = _make_handler(CreateStubHandler, application=app)
+        handler.request = SimpleNamespace(body=json.dumps(body).encode())
+        return handler
+
+    def test_writes_default_boilerplate_when_no_template(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build({"path": stub_path})
+
+            _run(handler, "post")
+
+            handler.finish.assert_called_once_with(
+                {"success": True, "path": stub_path}
+            )
+            content = Path(stub_path).read_text()
+            assert "import marimo" in content
+            assert "__generated_with" in content
+            assert 'app = marimo.App(width="medium")' in content
+            assert 'if __name__ == "__main__":' in content
+
+    def test_uses_cached_template_verbatim(self):
+        from marimo_jupyter_extension.handlers import _DEFAULT_FILE_SETTING
+
+        template = (
+            "import marimo\n\n"
+            '__generated_with = "0.99.0"\n'
+            'app = marimo.App(width="medium")\n\n'
+            "with app.setup(hide_code=True):\n"
+            "    from my_pkg import helper  # noqa: F401\n\n"
+            'if __name__ == "__main__":\n'
+            "    app.run()\n"
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build(
+                {"path": stub_path},
+                settings={_DEFAULT_FILE_SETTING: template},
+            )
+
+            _run(handler, "post")
+
+            handler.finish.assert_called_once_with(
+                {"success": True, "path": stub_path}
+            )
+            assert Path(stub_path).read_text() == template
+
+    def test_cached_template_does_not_substitute_version(self):
+        """The cached template is emitted verbatim; the running marimo
+        version is *not* spliced into __generated_with."""
+        from marimo_jupyter_extension.handlers import _DEFAULT_FILE_SETTING
+
+        template = (
+            "import marimo\n"
+            '__generated_with = "0.0.0-template"\n'
+            'app = marimo.App(width="medium")\n'
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build(
+                {"path": stub_path},
+                settings={_DEFAULT_FILE_SETTING: template},
+            )
+            with patch(
+                "marimo_jupyter_extension.version_info.get_marimo_version",
+                return_value="9.9.9",
+            ):
+                _run(handler, "post")
+
+            content = Path(stub_path).read_text()
+            assert '"0.0.0-template"' in content
+            assert "9.9.9" not in content
+
+    def test_pep723_header_prepended_to_cached_template(self):
+        from marimo_jupyter_extension.handlers import _DEFAULT_FILE_SETTING
+
+        template = "import marimo\napp = marimo.App()\n"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build(
+                {
+                    "path": stub_path,
+                    "venv": "/srv/envs/proj/bin/python3.13",
+                },
+                settings={_DEFAULT_FILE_SETTING: template},
+            )
+
+            _run(handler, "post")
+
+            content = Path(stub_path).read_text()
+            assert content.startswith("# /// script\n")
+            assert '# path = "/srv/envs/proj"\n' in content
+            assert content.endswith(template)
+
+    def test_missing_path_returns_400(self):
+        handler = self._build({})
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "Missing path"}
+        )
+
+
+class TestLoadDefaultFile:
+    """`_load_default_file` reads the configured template once."""
+
+    def test_returns_none_when_unconfigured(self, clean_env):
+        from marimo_jupyter_extension.handlers import _load_default_file
+
+        server_app = MagicMock()
+        assert _load_default_file(server_app) is None
+
+    def test_reads_file_contents(self, clean_env):
+        from marimo_jupyter_extension import config as config_mod
+        from marimo_jupyter_extension.handlers import _load_default_file
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = Path(tmpdir) / "tmpl.py"
+            template.write_text("import marimo\napp = marimo.App()\n")
+
+            traitlets_config = config_mod.MarimoProxyConfig()
+            traitlets_config.default_file = str(template)
+
+            server_app = MagicMock()
+            with patch(
+                "marimo_jupyter_extension.config.get_config",
+                return_value=config_mod.get_config(traitlets_config),
+            ):
+                content = _load_default_file(server_app)
+
+            assert content == "import marimo\napp = marimo.App()\n"
+
+    def test_raises_on_missing_file(self, clean_env):
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+        from marimo_jupyter_extension.handlers import _load_default_file
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.default_file = "/nonexistent/template.py"
+
+        from marimo_jupyter_extension import config as config_mod
+
+        server_app = MagicMock()
+        with patch(
+            "marimo_jupyter_extension.config.get_config",
+            return_value=config_mod.get_config(traitlets_config),
+        ):
+            import pytest
+
+            with pytest.raises(FileNotFoundError):
+                _load_default_file(server_app)
+
+
 class TestLoadServerExtension:
     """Test suite for _load_jupyter_server_extension."""
 
@@ -306,3 +474,32 @@ class TestLoadServerExtension:
         page_config = server_app.web_app.settings["page_config_data"]
         assert page_config["existing"] == "value"
         assert page_config["marimoVersion"] == "0.23.1"
+
+    def test_aborts_handler_registration_when_default_file_missing(
+        self, clean_env
+    ):
+        """The template read must run *before* add_handlers. If the
+        operator points default_file at a missing path, the extension
+        load aborts with FileNotFoundError and no routes get
+        registered — preventing CreateStubHandler from silently falling
+        back to default boilerplate."""
+        import pytest
+
+        from marimo_jupyter_extension import config as config_mod
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+        from marimo_jupyter_extension.handlers import (
+            _load_jupyter_server_extension,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.default_file = "/nonexistent/template.py"
+
+        server_app = self._make_server_app()
+        with patch(
+            "marimo_jupyter_extension.config.get_config",
+            return_value=config_mod.get_config(traitlets_config),
+        ):
+            with pytest.raises(FileNotFoundError):
+                _load_jupyter_server_extension(server_app)
+
+        server_app.web_app.add_handlers.assert_not_called()
