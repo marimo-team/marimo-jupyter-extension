@@ -78,6 +78,33 @@ c.MarimoProxyConfig.idle_timeout = 30.0
 # Seconds to keep a session alive after a websocket disconnect.
 # None (the default) keeps sessions open indefinitely.
 c.MarimoProxyConfig.session_ttl = 300
+
+# Path to a template file whose contents are used as the body of every
+# new notebook (POST /marimo-tools/create-stub). Read once at extension
+# load and cached for the server's lifetime; restart to pick up changes.
+# If the path doesn't exist at boot, this extension fails to load and
+# the "New Marimo Notebook" launcher entry will 404 until the path is
+# fixed and the server is restarted. The file is emitted verbatim —
+# pin __generated_with in the template if you care which version
+# reads it.
+c.MarimoProxyConfig.default_file = "/opt/marimo/notebook_template.py"
+```
+
+A typical template (e.g. with a shared `app.setup` block so every new
+notebook starts with imports in scope):
+
+```python
+import marimo
+
+__generated_with = "0.23.8"
+app = marimo.App(width="medium")
+
+with app.setup(hide_code=True):
+    import os  # noqa: F401
+    from pathlib import Path  # noqa: F401
+
+if __name__ == "__main__":
+    app.run()
 ```
 
 ## Spawner Environment

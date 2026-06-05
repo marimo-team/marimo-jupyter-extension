@@ -121,12 +121,28 @@ class MarimoProxyConfig(Configurable):
         ),
     ).tag(config=True)
 
+    default_file = Unicode(
+        allow_none=True,
+        help=(
+            "Path to a template file whose contents are used as the body of "
+            "newly created notebooks (via POST /marimo-tools/create-stub). "
+            "When set, the file is read once at extension load and cached "
+            "for the lifetime of the Jupyter Server; restart the server to "
+            "pick up changes. The contents are written verbatim; the "
+            "extension does not parse or substitute __generated_with."
+        ),
+    ).tag(config=True)
+
     @default("host")
     def _default_host(self):
         return _detect_localhost_host()
 
     @default("marimo_path")
     def _default_marimo_path(self):
+        return None
+
+    @default("default_file")
+    def _default_default_file(self):
         return None
 
     @default("uvx_path")
@@ -159,6 +175,7 @@ class Config:
     skip_update_check: bool = False
     idle_timeout: float | None = None
     session_ttl: int | None = None
+    default_file: str | None = None
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
@@ -189,6 +206,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         skip_update_check=bool(cfg.skip_update_check),
         idle_timeout=cfg.idle_timeout,
         session_ttl=cfg.session_ttl,
+        default_file=cfg.default_file,
     )
 
 

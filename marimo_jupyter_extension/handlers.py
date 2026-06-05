@@ -15,6 +15,11 @@ from .executable import MARIMO_VERSION
 
 _WATCHER_POLL_INTERVAL = 1.0
 
+# Key under which the cached default-file body is stored on
+# web_app.settings. Read once at extension load (see
+# _load_jupyter_server_extension) and consumed by CreateStubHandler.
+_DEFAULT_FILE_SETTING = "marimo_default_stub_content"
+
 
 def _find_marimo_proxy_state(web_app):
     """Return the jupyter-server-proxy state dict for the marimo route."""
@@ -247,25 +252,38 @@ class CreateStubHandler(JupyterHandler):
                 ]
             )
 
-        # Add marimo app boilerplate. Prefer the running marimo's
-        # version so the stub matches what will read it; fall back to
-        # the floor MARIMO_VERSION when marimo can't be queried (e.g.
-        # uvx mode with no marimo in the Jupyter env).
-        marimo_version = version_info.get_marimo_version() or MARIMO_VERSION
-        lines.extend(
-            [
-                "import marimo",
-                "",
-                f'__generated_with = "{marimo_version}"',
-                'app = marimo.App(width="medium")',
-                "",
-                "",
-                'if __name__ == "__main__":',
-                "    app.run()",
-                "",
-            ]
-        )
-
+        cached_default = self.application.settings.get(_DEFAULT_FILE_SETTING)
+        if cached_default is not None:
+            # Operator provided a template via
+            # c.MarimoProxyConfig.default_file — emit its contents
+            # verbatim after the optional PEP 723 header. The template
+            # is responsible for being a parseable marimo notebook
+            # (import marimo, app = marimo.App(...), the __main__
+            # block); we don't substitute __generated_with so the
+            # template's pin (if any) wins.
+            lines.append(cached_default.rstrip("\n"))
+        else:
+            # Default boilerplate. Prefer the running marimo's
+            # version so the stub matches what will read it; fall
+            # back to the floor MARIMO_VERSION when marimo can't be
+            # queried (e.g. uvx mode with no marimo in the Jupyter
+            # env).
+            marimo_version = (
+                version_info.get_marimo_version() or MARIMO_VERSION
+            )
+            lines.extend(
+                [
+                    "import marimo",
+                    "",
+                    f'__generated_with = "{marimo_version}"',
+                    'app = marimo.App(width="medium")',
+                    "",
+                    "",
+                    'if __name__ == "__main__":',
+                    "    app.run()",
+                ]
+            )
+        lines.append("")
         content = "\n".join(lines)
 
         try:
@@ -282,9 +300,66 @@ def _jupyter_server_extension_points():
     return [{"module": "marimo_jupyter_extension.handlers"}]
 
 
+def _load_default_file(server_app) -> str | None:
+    """Read the default_file template once at extension load.
+
+    Returns the file contents (a str) when default_file is configured,
+    or None when it isn't. Raises FileNotFoundError eagerly if the
+    operator configured a path that doesn't exist; jupyter-server's
+    extension manager logs the traceback and skips loading our
+    extension (the server itself keeps running, but
+    /marimo-tools/create-stub will 404 until the path is fixed and
+    the server is restarted). The alternative — deferring the read
+    to /marimo-tools/create-stub request handling — would surface
+    the misconfiguration as a 500 on every "New Notebook" click and
+    leave the boot log silent.
+
+    Reading once at startup (rather than per-request) also means
+    operators must restart Jupyter Server to pick up template
+    changes. This trades the convenience of hot-swap for a clearer
+    audit boundary: whatever was on disk when the server booted is
+    what users get.
+    """
+    from .config import get_config
+
+    cfg = get_config()
+    if not cfg.default_file:
+        return None
+
+    template_path = Path(cfg.default_file).expanduser()
+    try:
+        content = template_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        server_app.log.error(
+            "c.MarimoProxyConfig.default_file points at %s but the "
+            "file does not exist; the marimo-jupyter-extension will "
+            "fail to load and /marimo-tools/create-stub will 404 "
+            "until this is fixed and the server is restarted.",
+            template_path,
+        )
+        raise
+    server_app.log.info(
+        "marimo-jupyter-extension loaded default notebook template "
+        "from %s (%d bytes); restart to pick up changes.",
+        template_path,
+        len(content),
+    )
+    return content
+
+
 def _load_jupyter_server_extension(server_app):
     """Load the jupyter server extension."""
     from . import __version__
+
+    # Read default_file first so a misconfigured path aborts the load
+    # cleanly. If we registered handlers first and *then* raised, the
+    # tornado routes would survive — CreateStubHandler would still be
+    # reachable but would silently fall back to the default boilerplate
+    # (cached content never landed on web_app.settings), masking the
+    # operator's misconfiguration. Failing before any side effects
+    # keeps "extension loaded successfully" and "template wired up" as
+    # a single atomic outcome.
+    default_file_content = _load_default_file(server_app)
 
     base_url = server_app.web_app.settings["base_url"]
     server_app.web_app.add_handlers(
@@ -301,6 +376,11 @@ def _load_jupyter_server_extension(server_app):
         ],
     )
     IOLoop.current().spawn_callback(_proc_watcher_loop, server_app)
+
+    if default_file_content is not None:
+        server_app.web_app.settings[_DEFAULT_FILE_SETTING] = (
+            default_file_content
+        )
 
     page_config = server_app.web_app.settings.setdefault(
         "page_config_data", {}
