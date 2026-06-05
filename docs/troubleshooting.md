@@ -92,10 +92,10 @@ Run `marimo config show` in a JupyterHub terminal to verify marimo's effective c
 
 **Cause**: marimo version is too old.
 
-**Solution**: Upgrade to marimo 0.23.4 or newer:
+**Solution**: Upgrade to marimo 0.23.9 or newer:
 
 ```bash
-pip install 'marimo>=0.23.4'
+pip install 'marimo>=0.23.9'
 ```
 
 ### JupyterHub Issues
