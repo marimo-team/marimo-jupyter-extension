@@ -326,9 +326,9 @@ def _load_default_file(server_app) -> str | None:
     if not cfg.default_file:
         return None
 
-    template_path = Path(cfg.default_file)
+    template_path = Path(cfg.default_file).expanduser()
     try:
-        content = template_path.read_text()
+        content = template_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         server_app.log.error(
             "c.MarimoProxyConfig.default_file points at %s but the "
