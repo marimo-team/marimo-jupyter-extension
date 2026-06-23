@@ -285,7 +285,14 @@ class TestRestartHandler:
             async def kill(self):
                 calls.append("kill")
 
-        proxy_state = {"proc": FakeProc(), "proc_lock": asyncio.Lock()}
+        class NoopLock:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        proxy_state = {"proc": FakeProc(), "proc_lock": NoopLock()}
         handler = self._run_restart(proxy_state)
 
         assert calls == ["terminate"]  # SIGTERM, never SIGKILL
@@ -305,7 +312,14 @@ class TestRestartHandler:
             async def kill(self):
                 calls.append("kill")
 
-        proxy_state = {"proc": FakeProc(), "proc_lock": asyncio.Lock()}
+        class NoopLock:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        proxy_state = {"proc": FakeProc(), "proc_lock": NoopLock()}
         with patch(
             "marimo_jupyter_extension.handlers._SIGTERM_GRACE_SECONDS",
             0.01,
