@@ -107,6 +107,14 @@ if __name__ == "__main__":
     app.run()
 ```
 
+> **PEP 723 / sandbox metadata:** a leading `# /// script ... # ///` block at
+> the top of the template is stripped when the template is loaded. The venv
+> for a new notebook is supplied per-request (the launcher passes it), so
+> keeping the template's own block would produce a duplicate PEP 723 block and
+> `uv` would reject the file. Note this means any `requires-python` or
+> `dependencies` pins placed in that leading block are dropped — manage those
+> outside the leading PEP 723 block if you need them.
+
 ## Spawner Environment
 
 For JupyterHub deployments using SystemdSpawner, configure the spawned notebook environment:

@@ -250,6 +250,131 @@ class TestHealthHandler:
         handler.finish.assert_called_once_with({"process_alive": False})
 
 
+class TestRestartHandler:
+    """`RestartHandler.post` must SIGTERM (terminate) the marimo proc, not
+    SIGKILL (kill) it.
+
+    Under --sandbox marimo forwards SIGTERM to its inner uv process group;
+    SIGKILL is uncatchable and orphans that child, which keeps the cached
+    port and makes the next spawn collide. SIGKILL is only a last-resort
+    fallback if SIGTERM is ignored past the grace period.
+    """
+
+    def _run_restart(self, proxy_state):
+        from marimo_jupyter_extension import handlers
+        from marimo_jupyter_extension.handlers import RestartHandler
+
+        original = handlers._find_marimo_proxy_state
+        handlers._find_marimo_proxy_state = lambda _app: proxy_state
+        try:
+            handler = _make_handler(
+                RestartHandler, application=SimpleNamespace()
+            )
+            _run(handler, "post")
+        finally:
+            handlers._find_marimo_proxy_state = original
+        return handler
+
+    def test_uses_terminate_not_kill(self):
+        calls = []
+
+        class FakeProc:
+            async def terminate(self):
+                calls.append("terminate")
+
+            async def kill(self):
+                calls.append("kill")
+
+        class NoopLock:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        proxy_state = {"proc": FakeProc(), "proc_lock": NoopLock()}
+        handler = self._run_restart(proxy_state)
+
+        assert calls == ["terminate"]  # SIGTERM, never SIGKILL
+        assert "proc" not in proxy_state  # state cleared for respawn
+        handler.finish.assert_called_once_with(
+            {"success": True, "message": "Server restarting"}
+        )
+
+    def test_falls_back_to_kill_when_terminate_times_out(self):
+        calls = []
+
+        class FakeProc:
+            async def terminate(self):
+                calls.append("terminate")
+                await asyncio.sleep(10)  # never returns within the grace
+
+            async def kill(self):
+                calls.append("kill")
+
+        class NoopLock:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        proxy_state = {"proc": FakeProc(), "proc_lock": NoopLock()}
+        with patch(
+            "marimo_jupyter_extension.handlers._SIGTERM_GRACE_SECONDS",
+            0.01,
+        ):
+            handler = self._run_restart(proxy_state)
+
+        assert calls == ["terminate", "kill"]
+        assert "proc" not in proxy_state
+        handler.finish.assert_called_once_with(
+            {"success": True, "message": "Server restarting"}
+        )
+
+    def test_returns_503_when_proxy_not_initialized(self):
+        handler = self._run_restart(None)
+
+        handler.set_status.assert_called_once_with(503)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "Proxy not initialized yet"}
+        )
+
+
+class TestStripLeadingPep723:
+    """`_strip_leading_pep723` drops a leading PEP 723 block so it can't
+    collide with the venv block CreateStubHandler prepends."""
+
+    def test_strips_leading_block(self):
+        from marimo_jupyter_extension.handlers import _strip_leading_pep723
+
+        text = (
+            "# /// script\n"
+            "# [tool.marimo.venv]\n"
+            '# path = "/orig/venv"\n'
+            "# ///\n"
+            "\n"
+            "import marimo\napp = marimo.App()\n"
+        )
+        assert (
+            _strip_leading_pep723(text)
+            == "import marimo\napp = marimo.App()\n"
+        )
+
+    def test_no_block_unchanged(self):
+        from marimo_jupyter_extension.handlers import _strip_leading_pep723
+
+        text = "import marimo\napp = marimo.App()\n"
+        assert _strip_leading_pep723(text) == text
+
+    def test_unterminated_block_left_intact(self):
+        from marimo_jupyter_extension.handlers import _strip_leading_pep723
+
+        # No closing fence: don't eat the whole template.
+        text = "# /// script\n# path = x\nimport marimo\n"
+        assert _strip_leading_pep723(text) == text
+
+
 class TestCreateStubHandler:
     """`CreateStubHandler.post` writes a marimo notebook stub to disk.
 
@@ -356,6 +481,52 @@ class TestCreateStubHandler:
             assert '# path = "/srv/envs/proj"\n' in content
             assert content.endswith(template)
 
+    def test_no_duplicate_pep723_when_template_has_block(self, clean_env):
+        """A template carrying its own PEP 723 block + a venv request
+        must not yield two blocks (uv rejects multiple metadata blocks).
+
+        Exercises the full path: _load_default_file strips the template's
+        leading block, then CreateStubHandler prepends the request venv.
+        """
+        from marimo_jupyter_extension import config as config_mod
+        from marimo_jupyter_extension.handlers import (
+            _DEFAULT_FILE_SETTING,
+            _load_default_file,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = Path(tmpdir) / "tmpl.py"
+            template.write_text(
+                "# /// script\n"
+                "# [tool.marimo.venv]\n"
+                '# path = "/orig/venv"\n'
+                "# ///\n"
+                "\n"
+                "import marimo\napp = marimo.App()\n"
+            )
+            traitlets_config = config_mod.MarimoProxyConfig()
+            traitlets_config.default_file = str(template)
+            server_app = MagicMock()
+            with patch(
+                "marimo_jupyter_extension.config.get_config",
+                return_value=config_mod.get_config(traitlets_config),
+            ):
+                cached = _load_default_file(server_app)
+
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build(
+                {"path": stub_path, "venv": "/srv/envs/proj/bin/python3.13"},
+                settings={_DEFAULT_FILE_SETTING: cached},
+            )
+
+            _run(handler, "post")
+
+            content = Path(stub_path).read_text()
+            assert content.count("# /// script") == 1
+            # The request-time venv wins; the template's stale path is gone.
+            assert '# path = "/srv/envs/proj"' in content
+            assert '# path = "/orig/venv"' not in content
+
     def test_missing_path_returns_400(self):
         handler = self._build({})
 
@@ -396,6 +567,33 @@ class TestLoadDefaultFile:
 
             assert content == "import marimo\napp = marimo.App()\n"
 
+    def test_strips_leading_pep723_block(self, clean_env):
+        """A leading PEP 723 block is removed at load time so it can't
+        duplicate the venv block CreateStubHandler prepends."""
+        from marimo_jupyter_extension import config as config_mod
+        from marimo_jupyter_extension.handlers import _load_default_file
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = Path(tmpdir) / "tmpl.py"
+            template.write_text(
+                "# /// script\n"
+                '# path = "/orig/venv"\n'
+                "# ///\n"
+                "\n"
+                "import marimo\napp = marimo.App()\n"
+            )
+            traitlets_config = config_mod.MarimoProxyConfig()
+            traitlets_config.default_file = str(template)
+            server_app = MagicMock()
+            with patch(
+                "marimo_jupyter_extension.config.get_config",
+                return_value=config_mod.get_config(traitlets_config),
+            ):
+                content = _load_default_file(server_app)
+
+            assert "# /// script" not in content
+            assert content == "import marimo\napp = marimo.App()\n"
+
     def test_raises_on_missing_file(self, clean_env):
         from marimo_jupyter_extension.config import MarimoProxyConfig
         from marimo_jupyter_extension.handlers import _load_default_file
@@ -414,6 +612,30 @@ class TestLoadDefaultFile:
 
             with pytest.raises(FileNotFoundError):
                 _load_default_file(server_app)
+
+    def test_directory_path_raises_with_actionable_log(self, clean_env):
+        """A directory (and other non-FileNotFound read errors) must
+        still surface the actionable c.MarimoProxyConfig.default_file
+        pointer, not a bare traceback."""
+        import pytest
+
+        from marimo_jupyter_extension import config as config_mod
+        from marimo_jupyter_extension.handlers import _load_default_file
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            traitlets_config = config_mod.MarimoProxyConfig()
+            traitlets_config.default_file = tmpdir  # a directory, not a file
+            server_app = MagicMock()
+            with patch(
+                "marimo_jupyter_extension.config.get_config",
+                return_value=config_mod.get_config(traitlets_config),
+            ):
+                with pytest.raises(IsADirectoryError):
+                    _load_default_file(server_app)
+
+            assert server_app.log.error.called
+            log_fmt = server_app.log.error.call_args[0][0]
+            assert "c.MarimoProxyConfig.default_file" in log_fmt
 
 
 class TestLoadServerExtension:

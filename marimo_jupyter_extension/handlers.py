@@ -15,6 +15,13 @@ from .executable import MARIMO_VERSION
 
 _WATCHER_POLL_INTERVAL = 1.0
 
+# How long to wait for marimo to honor SIGTERM (proc.terminate()) before
+# falling back to SIGKILL on restart. SIGTERM lets marimo's own signal
+# handler forward the signal to the --sandbox child's process group
+# (os.killpg) so the whole subtree shuts down; SIGKILL is uncatchable and
+# would orphan that child (see RestartHandler.post).
+_SIGTERM_GRACE_SECONDS = 5.0
+
 # Key under which the cached default-file body is stored on
 # web_app.settings. Read once at extension load (see
 # _load_jupyter_server_extension) and consumed by CreateStubHandler.
@@ -88,8 +95,9 @@ class RestartHandler(JupyterHandler):
 
         POST /marimo-tools/restart
 
-        Finds the jupyter-server-proxy handler's state, kills the current
-        process, and clears the state so the next request spawns a new process.
+        Finds the jupyter-server-proxy handler's state, terminates the
+        current process, and clears the state so the next request spawns a
+        new process.
         """
         proxy_state = _find_marimo_proxy_state(self.application)
 
@@ -104,8 +112,26 @@ class RestartHandler(JupyterHandler):
             async with proxy_state["proc_lock"]:
                 proc = proxy_state.get("proc")
                 if proc and proc != "process not managed":
+                    # Use SIGTERM (terminate), not SIGKILL (kill): under
+                    # --sandbox marimo spawns its inner uv process in a new
+                    # session and forwards SIGINT/SIGTERM/SIGHUP to that
+                    # group via os.killpg. SIGKILL is uncatchable, so it
+                    # only reaps the outer CLI and orphans the inner child,
+                    # which keeps holding the cached port and makes the next
+                    # spawn collide ([Errno 98]). SIGTERM lets marimo tear
+                    # down the whole subtree. Fall back to SIGKILL only if
+                    # the outer process ignores SIGTERM, so restart always
+                    # returns.
                     try:
-                        await proc.kill()
+                        await asyncio.wait_for(
+                            proc.terminate(),
+                            timeout=_SIGTERM_GRACE_SECONDS,
+                        )
+                    except asyncio.TimeoutError:
+                        try:
+                            await proc.kill()
+                        except Exception:
+                            pass  # Already dead
                     except Exception:
                         pass  # Already dead
                 # Clear the process reference so next request spawns new one
@@ -300,6 +326,40 @@ def _jupyter_server_extension_points():
     return [{"module": "marimo_jupyter_extension.handlers"}]
 
 
+def _strip_leading_pep723(text: str) -> str:
+    """Drop a leading PEP 723 ``# /// script ... # ///`` block.
+
+    CreateStubHandler prepends its own ``[tool.marimo.venv]`` PEP 723 block
+    per-request (when the body carries ``venv``). If the operator's
+    default_file template *also* starts with a PEP 723 block (natural if they
+    copy-pasted a real notebook), the stub ends up with two blocks and uv
+    rejects it ("multiple PEP 723 metadata blocks"). Stripping the template's
+    leading block at load time lets the request-time venv win.
+
+    Only a block at the very top (after any leading blank/whitespace-only
+    lines) is removed; any ``requires-python``/``dependencies`` pins it
+    contained are dropped along with it.
+    """
+    lines = text.splitlines(keepends=True)
+    start = 0
+    while start < len(lines) and lines[start].strip() == "":
+        start += 1
+    if start >= len(lines) or lines[start].strip() != "# /// script":
+        return text
+    # Find the closing fence.
+    for end in range(start + 1, len(lines)):
+        if lines[end].strip() == "# ///":
+            # Drop the block (and a single trailing blank line, if present)
+            # so we don't leave an awkward gap at the top of the stub.
+            rest = lines[end + 1 :]
+            if rest and rest[0].strip() == "":
+                rest = rest[1:]
+            return "".join(lines[:start] + rest)
+    # Unterminated block: leave the content untouched rather than eat the
+    # whole template.
+    return text
+
+
 def _load_default_file(server_app) -> str | None:
     """Read the default_file template once at extension load.
 
@@ -329,15 +389,29 @@ def _load_default_file(server_app) -> str | None:
     template_path = Path(cfg.default_file).expanduser()
     try:
         content = template_path.read_text(encoding="utf-8")
-    except FileNotFoundError:
+    except (
+        FileNotFoundError,
+        IsADirectoryError,
+        PermissionError,
+        UnicodeDecodeError,
+        OSError,
+    ) as e:
+        # Every one of these (missing file, a directory, unreadable perms,
+        # non-utf-8 bytes, broken symlink, ...) lands in the same place:
+        # the extension fails to load and /marimo-tools/* all 404. Surface
+        # the actionable trait pointer instead of a bare traceback.
         server_app.log.error(
             "c.MarimoProxyConfig.default_file points at %s but the "
-            "file does not exist; the marimo-jupyter-extension will "
-            "fail to load and /marimo-tools/create-stub will 404 "
+            "file could not be read (%s); the marimo-jupyter-extension "
+            "will fail to load and /marimo-tools/create-stub will 404 "
             "until this is fixed and the server is restarted.",
             template_path,
+            e.__class__.__name__,
         )
         raise
+    # Strip a leading PEP 723 block so it doesn't collide with the venv block
+    # CreateStubHandler prepends per-request (see _strip_leading_pep723).
+    content = _strip_leading_pep723(content)
     server_app.log.info(
         "marimo-jupyter-extension loaded default notebook template "
         "from %s (%d bytes); restart to pick up changes.",
