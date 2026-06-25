@@ -4,6 +4,7 @@ import {
   type JupyterFrontEndPlugin,
 } from '@jupyterlab/application';
 import {
+  Clipboard,
   Dialog,
   InputDialog,
   Notification,
@@ -580,7 +581,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           appUrl = `${baseUrl}?file=${encodeURIComponent(filePath)}&show-chrome=false&view-as=present`;
         }
 
-        await navigator.clipboard.writeText(appUrl);
+        Clipboard.copyToSystem(appUrl);
         Notification.success('App link copied to clipboard');
       },
     });
