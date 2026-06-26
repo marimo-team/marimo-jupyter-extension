@@ -58,7 +58,7 @@
     "@lumino/widgets": "^2.7.5"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.5.1",
     "@jupyterlab/builder": "4.5.8",
     "@types/node": "24.12.3",
     "@typescript-eslint/eslint-plugin": "8.58.2",
