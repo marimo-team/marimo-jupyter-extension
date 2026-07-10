@@ -147,6 +147,44 @@ class TestSetupMarimoserver:
         assert cmd.index("--log-level") < cmd.index("edit")
 
 
+class TestTransportEnvironment:
+    """Test suite for the MARIMO_SERVER_TRANSPORT environment variable."""
+
+    def test_environment_defaults_to_websocket(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """environment should set MARIMO_SERVER_TRANSPORT=websocket by default."""
+        from marimo_jupyter_extension import setup_marimoserver
+
+        result = setup_marimoserver()
+
+        assert result["environment"]["MARIMO_SERVER_TRANSPORT"] == "websocket"
+
+    def test_environment_uses_configured_transport(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """environment should reflect the configured transport (sse)."""
+        from marimo_jupyter_extension.config import Config
+
+        mock_config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            transport="sse",
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_config",
+            return_value=mock_config,
+        ):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            result = setup_marimoserver()
+
+        assert result["environment"]["MARIMO_SERVER_TRANSPORT"] == "sse"
+
+
 class TestTokenAuthentication:
     """Test suite for token-based authentication."""
 

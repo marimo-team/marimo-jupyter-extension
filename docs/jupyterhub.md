@@ -64,7 +64,7 @@ dependencies = [
     "notebook>=7.5.0",
     "oauthenticator>=17.3.0",
     "jupyterhub-systemdspawner>=1.0.2",
-    "marimo>=0.23.9",
+    "marimo>=0.23.14",
     "marimo-jupyter-extension>=0.1.0",
 ]
 ```
@@ -114,6 +114,16 @@ c.SystemdSpawner.environment = {
     "XDG_CACHE_HOME": "/opt/notebooks/.cache",
     "HOME": "/opt/notebooks",
 }
+```
+
+The proxy accepts additional `MarimoProxyConfig` options in the same file, for
+example:
+
+```python
+# Use SSE instead of WebSockets for the marimo kernel connection. Needed behind
+# proxies that don't forward WebSockets, e.g. AWS SageMaker (requires
+# marimo>=0.23.14). Defaults to "websocket".
+c.MarimoProxyConfig.transport = "sse"
 ```
 
 ## Part 3: SSL & Reverse Proxy

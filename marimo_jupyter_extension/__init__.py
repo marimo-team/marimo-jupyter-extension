@@ -61,6 +61,7 @@ def setup_marimoserver():
                 else []
             ),
         ],
+        "environment": {"MARIMO_SERVER_TRANSPORT": config.transport},
         "timeout": config.timeout,
         "absolute_url": True,
         "request_headers_override": {

@@ -88,14 +88,34 @@ c.ServerApp.tornado_settings = {"websocket_max_message_size": 256 * 1024 * 1024}
 
 Run `marimo config show` in a JupyterHub terminal to verify marimo's effective config.
 
+### Marimo fails to connect behind a proxy (e.g. AWS SageMaker)
+
+**Cause**: Some proxies (notably AWS SageMaker) don't forward WebSocket
+connections, which marimo uses for its kernel by default. The notebook loads but
+never connects, often failing silently.
+
+**Solution**: Switch marimo to the Server-Sent Events (SSE) transport, which
+works over plain HTTP. This sets `MARIMO_SERVER_TRANSPORT=sse` on the marimo
+process:
+
+```python
+c.MarimoProxyConfig.transport = "sse"
+```
+
+Add it to `jupyterhub_config.py` (JupyterHub) or `jupyter_server_config.py`
+(standalone JupyterLab); or pass `--MarimoProxyConfig.transport=sse` as a CLI
+flag. The default is `websocket`, which is preferred wherever WebSockets work.
+
+> **Note**: SSE transport requires `marimo>=0.23.14`.
+
 ### Error: "No such option: --base-url"
 
 **Cause**: marimo version is too old.
 
-**Solution**: Upgrade to marimo 0.23.9 or newer:
+**Solution**: Upgrade to marimo 0.23.14 or newer:
 
 ```bash
-pip install 'marimo>=0.23.9'
+pip install 'marimo>=0.23.14'
 ```
 
 ### JupyterHub Issues

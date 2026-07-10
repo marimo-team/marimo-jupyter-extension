@@ -114,6 +114,34 @@ class TestMarimoProxyConfig:
 
         assert config.no_sandbox is False
 
+    def test_default_transport_is_websocket(self, clean_env):
+        """Default transport should be 'websocket'."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        assert config.transport == "websocket"
+
+    def test_transport_accepts_sse(self, clean_env):
+        """transport should accept 'sse'."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+        config.transport = "sse"
+
+        assert config.transport == "sse"
+
+    def test_transport_rejects_invalid_value(self, clean_env):
+        """transport should reject values other than websocket/sse."""
+        from traitlets import TraitError
+
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        with pytest.raises(TraitError):
+            config.transport = "polling"
+
     def test_default_file_is_none(self, clean_env):
         """Default default_file should be None."""
         from marimo_jupyter_extension.config import MarimoProxyConfig
@@ -237,6 +265,32 @@ class TestGetConfig:
         result = get_config(traitlets_config)
 
         assert result.no_sandbox is True
+
+    def test_transport_default_is_websocket(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """transport should default to 'websocket' in get_config result."""
+        from marimo_jupyter_extension.config import get_config
+
+        result = get_config()
+
+        assert result.transport == "websocket"
+
+    def test_transport_applied_from_traitlets(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """transport should be applied from traitlets config."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.transport = "sse"
+
+        result = get_config(traitlets_config)
+
+        assert result.transport == "sse"
 
     def test_host_auto_detected_as_ipv6(self, clean_env, mock_marimo_in_path):
         """host should be '::1' when localhost resolves to IPv6 first."""

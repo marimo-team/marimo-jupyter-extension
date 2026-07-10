@@ -6,7 +6,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from jupyter_server.utils import url_path_join
-from traitlets import Bool, Float, Int, List, Unicode, default
+from traitlets import (
+    Bool,
+    Float,
+    Int,
+    List,
+    TraitError,
+    Unicode,
+    default,
+    validate,
+)
 from traitlets.config import Configurable
 
 DEFAULT_TIMEOUT = 60
@@ -121,6 +130,16 @@ class MarimoProxyConfig(Configurable):
         ),
     ).tag(config=True)
 
+    transport = Unicode(
+        "websocket",
+        help=(
+            "Kernel connection transport for marimo, sets the "
+            "MARIMO_SERVER_TRANSPORT environment variable. Either 'websocket' "
+            "(the default) or 'sse'. Use 'sse' for deployments behind a proxy "
+            "that doesn't handle WebSockets, e.g. AWS SageMaker."
+        ),
+    ).tag(config=True)
+
     default_file = Unicode(
         allow_none=True,
         help=(
@@ -132,6 +151,15 @@ class MarimoProxyConfig(Configurable):
             "extension does not parse or substitute __generated_with."
         ),
     ).tag(config=True)
+
+    @validate("transport")
+    def _validate_transport(self, proposal):
+        value = proposal["value"]
+        if value not in ("websocket", "sse"):
+            raise TraitError(
+                f"transport must be 'websocket' or 'sse', got {value!r}"
+            )
+        return value
 
     @default("host")
     def _default_host(self):
@@ -175,6 +203,7 @@ class Config:
     skip_update_check: bool = False
     idle_timeout: float | None = None
     session_ttl: int | None = None
+    transport: str = "websocket"
     default_file: str | None = None
 
 
@@ -206,6 +235,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         skip_update_check=bool(cfg.skip_update_check),
         idle_timeout=cfg.idle_timeout,
         session_ttl=cfg.session_ttl,
+        transport=cfg.transport,
         default_file=cfg.default_file,
     )
 
