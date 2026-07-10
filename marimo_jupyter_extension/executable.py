@@ -7,7 +7,7 @@ from .config import Config
 
 # Single source of truth for the marimo version this extension targets.
 # scripts/bump-marimo.sh updates this literal alongside the README docs.
-MARIMO_VERSION = "0.23.9"
+MARIMO_VERSION = "0.23.14"
 
 COMMON_LOCATIONS = [
     "~/.local/bin/marimo",

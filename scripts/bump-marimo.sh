@@ -43,8 +43,10 @@ if ! echo "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
   exit 1
 fi
 
-# Auto-detect current version from executable.py (canonical source)
-CURRENT_VERSION=$(sed -n 's/.*marimo\[sandbox\]>=\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' marimo_jupyter_extension/executable.py)
+# Auto-detect current version from executable.py (canonical source).
+# The version lives in the MARIMO_VERSION constant; the usage site is an
+# f-string (f"marimo[sandbox]>={MARIMO_VERSION}") with no literal digits.
+CURRENT_VERSION=$(sed -n 's/.*MARIMO_VERSION = "\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' marimo_jupyter_extension/executable.py)
 
 if [ -z "$CURRENT_VERSION" ]; then
   print_error "Could not detect current marimo version from executable.py"
@@ -66,6 +68,7 @@ FILES=(
   "docs/index.md"
   "docs/jupyterhub.md"
   "docs/troubleshooting.md"
+  "example/opt/jupyterhub/pyproject.toml"
 )
 
 # Summary
