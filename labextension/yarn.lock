@@ -399,9 +399,7 @@
     yjs "^13.5.40"
 
 "@jupyterlab/application@^4.5.6":
-  version "4.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/application/-/application-4.5.6.tgz"
-  integrity sha512-k9Bf/225bZmgoD+EBz2WFXmZqZbXOZMIJTKQBCkfKciVxZulUoKNZfrnhnECwuB6l9ph8Wk5t5IalqfT3ieEmw==
+  version "4.5.9"
   dependencies:
     "@fortawesome/fontawesome-free" "^5.12.0"
     "@jupyterlab/apputils" "^4.6.6"
@@ -425,9 +423,7 @@
     "@lumino/widgets" "^2.7.5"
 
 "@jupyterlab/apputils@^4.6.6":
-  version "4.6.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/apputils/-/apputils-4.6.6.tgz"
-  integrity sha512-dAKcadgFQZYmotP4E0MjO9JvqWI7xYuU6yHITqMjPEF41TAl1NBKowsGKla1rQQuUd3bj7HWaXPiENRwaS6Pcw==
+  version "4.6.9"
   dependencies:
     "@jupyterlab/coreutils" "^6.5.6"
     "@jupyterlab/observables" "^5.5.6"
@@ -511,9 +507,7 @@
     react "^18.2.0"
 
 "@jupyterlab/coreutils@^6.5.6":
-  version "6.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/coreutils/-/coreutils-6.5.6.tgz"
-  integrity sha512-hQCmgn1niIYxJRGradIkqIbKMgNnGP1dfXSli9amTwc4r1FEKJL5a88/jd6145BKDriMNLNacOY/kdrf579aOw==
+  version "6.5.9"
   dependencies:
     "@lumino/coreutils" "^2.2.2"
     "@lumino/disposable" "^2.1.5"
@@ -547,9 +541,7 @@
     react "^18.2.0"
 
 "@jupyterlab/docregistry@^4.5.6":
-  version "4.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/docregistry/-/docregistry-4.5.6.tgz"
-  integrity sha512-GtteJIw2CoFCvUyeCAxyPGXuJaGN+u86dTrmlyqaASVhiHYdEkyGiI6/o62HTRSIgbFUfrv0jAWpIRS+p9eDMA==
+  version "4.5.9"
   dependencies:
     "@jupyter/ydoc" "^3.1.0"
     "@jupyterlab/apputils" "^4.6.6"
@@ -571,9 +563,7 @@
     react "^18.2.0"
 
 "@jupyterlab/filebrowser@^4.5.6":
-  version "4.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/filebrowser/-/filebrowser-4.5.6.tgz"
-  integrity sha512-wylo9/jg4tXiCKUHT9mm3FmmgTBXzatJj08zLceOG/aFhJpFK2b6LfHtEtlNhhPsI66CUckGjMYYwnLb0GpjBA==
+  version "4.5.9"
   dependencies:
     "@jupyterlab/apputils" "^4.6.6"
     "@jupyterlab/coreutils" "^6.5.6"
@@ -598,9 +588,7 @@
     react "^18.2.0"
 
 "@jupyterlab/launcher@^4.5.6":
-  version "4.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/launcher/-/launcher-4.5.6.tgz"
-  integrity sha512-yxHrjf5WXwBevueVK+ySWZcU03+W2+XLZ+XbiZtJtjHp+02EaSIJpV10hiXwVanHqTXbflKfUIENd5F0GzWzcw==
+  version "4.5.9"
   dependencies:
     "@jupyterlab/apputils" "^4.6.6"
     "@jupyterlab/translation" "^4.5.6"
@@ -658,9 +646,7 @@
     lodash.escape "^4.0.1"
 
 "@jupyterlab/services@^7.5.6":
-  version "7.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/services/-/services-7.5.6.tgz"
-  integrity sha512-6O+Lh6WndKrqtP3LBrfWf5az22oIev7JU+Xx1R1af52LeWnQDPnfs6PhbhGEbX3KGI8ntNekKZXvjFEpe/FohQ==
+  version "7.5.9"
   dependencies:
     "@jupyter/ydoc" "^3.1.0"
     "@jupyterlab/coreutils" "^6.5.6"
@@ -726,9 +712,7 @@
     "@lumino/coreutils" "^2.2.2"
 
 "@jupyterlab/ui-components@^4.5.6":
-  version "4.5.6"
-  resolved "https://registry.npmjs.org/@jupyterlab/ui-components/-/ui-components-4.5.6.tgz"
-  integrity sha512-KwCXOBiLZJVq1N6BCnW8Fp/5B5JpHRQLiNgxhUrYMSQ29SD2/7TEvH3rKaa1Oft0Q0RUlfELb2MgwFDGOUn1gw==
+  version "4.5.9"
   dependencies:
     "@jupyter/react-components" "^0.16.6"
     "@jupyter/web-components" "^0.16.6"
@@ -787,9 +771,7 @@
     "@lumino/virtualdom" "^2.0.4"
 
 "@lumino/coreutils@^1.11.0 || ^2.0.0", "@lumino/coreutils@^1.11.0 || ^2.2.2", "@lumino/coreutils@^2.2.2":
-  version "2.2.2"
-  resolved "https://registry.npmjs.org/@lumino/coreutils/-/coreutils-2.2.2.tgz"
-  integrity sha512-zaKJaK7rawPATn2BGHkbMrR6oK3s9PxNe9KreLwWF2dB4ZBHDiEmNLRyHRorfJ7XqVOEXAsAAj0jFn+qJPC/4Q==
+  version "2.2.3"
   dependencies:
     "@lumino/algorithm" "^2.0.4"
 
@@ -856,9 +838,7 @@
     "@lumino/algorithm" "^2.0.4"
 
 "@lumino/widgets@^1.37.2 || ^2.7.5", "@lumino/widgets@^2.7.5":
-  version "2.7.5"
-  resolved "https://registry.npmjs.org/@lumino/widgets/-/widgets-2.7.5.tgz"
-  integrity sha512-i11PlbTsZYIvC/uhcC4FeeLnu/7vveG8WzXFbxPunjT1yGjleqQIPlpMOAJ5d4PwCKqeM8LYttYke6ZOXvXDLA==
+  version "2.9.0"
   dependencies:
     "@lumino/algorithm" "^2.0.4"
     "@lumino/commands" "^2.3.3"
