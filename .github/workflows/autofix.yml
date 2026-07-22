@@ -1,0 +1,63 @@
+name: autofix.ci # needed to securely identify the workflow
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      # Node toolchain (mirrors lint.yml lint-typescript)
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+        with:
+          package_json_file: labextension/package.json
+
+      - name: Install dependencies
+        working-directory: labextension
+        run: pnpm install --frozen-lockfile
+
+      # Python toolchain (mirrors lint.yml lint-python)
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      # Fixers: mutating variants of the lint.yml checks, each `|| true`
+      - name: Format (Biome)
+        working-directory: labextension
+        run: pnpm run format || true
+
+      - name: Lint fix (Biome)
+        working-directory: labextension
+        run: pnpm run lint:biome || true
+
+      - name: Lint fix (ESLint)
+        working-directory: labextension
+        run: pnpm run lint:eslint || true
+
+      - name: Ruff format (Python)
+        run: uvx ruff format . || true
+
+      - name: Ruff check (Python)
+        run: uvx ruff check --fix . || true
+
+      - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a # v1.3.4
