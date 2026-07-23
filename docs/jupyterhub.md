@@ -92,7 +92,9 @@ from oauthenticator.github import GitHubOAuthenticator
 c.JupyterHub.authenticator_class = GitHubOAuthenticator
 c.GitHubOAuthenticator.client_id = os.environ.get("GITHUB_CLIENT_ID")
 c.GitHubOAuthenticator.client_secret = os.environ.get("GITHUB_CLIENT_SECRET")
-c.GitHubOAuthenticator.oauth_callback_url = os.environ.get("OAUTH_CALLBACK_URL")
+c.GitHubOAuthenticator.oauth_callback_url = os.environ.get(
+    "OAUTH_CALLBACK_URL"
+)
 c.GitHubOAuthenticator.allowed_users = {"your-github-username"}
 c.GitHubOAuthenticator.scope = ["read:org"]
 
