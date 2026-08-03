@@ -83,7 +83,9 @@ Two caps in series: marimo's `runtime.output_max_bytes` (default 8 MB) and torna
 Raise marimo's side via PEP 723 script header, `~/.config/marimo/marimo.toml`, or `MARIMO_OUTPUT_MAX_BYTES` (on JupyterHub set it in `c.Spawner.environment`). Raise tornado's side via:
 
 ```python
-c.ServerApp.tornado_settings = {"websocket_max_message_size": 256 * 1024 * 1024}
+c.ServerApp.tornado_settings = {
+    "websocket_max_message_size": 256 * 1024 * 1024
+}
 ```
 
 Run `marimo config show` in a JupyterHub terminal to verify marimo's effective config.
