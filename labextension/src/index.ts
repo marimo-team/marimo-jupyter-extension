@@ -12,7 +12,6 @@ import {
   showErrorMessage,
 } from '@jupyterlab/apputils';
 import { PageConfig } from '@jupyterlab/coreutils';
-import type { DocumentRegistry } from '@jupyterlab/docregistry';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { KernelSpecAPI, ServerConnection } from '@jupyterlab/services';
