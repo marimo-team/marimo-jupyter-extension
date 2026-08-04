@@ -12,7 +12,6 @@ import {
   showErrorMessage,
 } from '@jupyterlab/apputils';
 import { PageConfig } from '@jupyterlab/coreutils';
-import type { DocumentRegistry } from '@jupyterlab/docregistry';
 import { IFileBrowserFactory } from '@jupyterlab/filebrowser';
 import { ILauncher } from '@jupyterlab/launcher';
 import { KernelSpecAPI, ServerConnection } from '@jupyterlab/services';
@@ -98,7 +97,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     const marimoBaseUrl = getMarimoBaseUrl();
 
     // Register the Marimo file type for _mo.py files
-    app.docRegistry.addFileType(marimoFileType as DocumentRegistry.IFileType);
+    app.docRegistry.addFileType(marimoFileType);
 
     // Shared helper: prompt for filename and create a notebook stub in the given directory
     async function createNotebookAt(
