@@ -90,6 +90,16 @@ c.ServerApp.tornado_settings = {
 
 Run `marimo config show` in a JupyterHub terminal to verify marimo's effective config.
 
+You may also have to set this explicitly in tornado if this does not seem to work:
+
+```python
+# /etc/jupyter/jupyter_server_config.py
+import tornado.websocket
+
+tornado.websocket._default_max_message_size = 104857600  # 100 MB
+```
+
+
 ### Marimo fails to connect behind a proxy (e.g. AWS SageMaker)
 
 **Cause**: Some proxies (notably AWS SageMaker) don't forward WebSocket
