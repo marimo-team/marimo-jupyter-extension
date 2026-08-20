@@ -8,6 +8,7 @@ import {
   Dialog,
   InputDialog,
   Notification,
+  WidgetTracker,
   showDialog,
   showErrorMessage,
 } from '@jupyterlab/apputils';
@@ -35,7 +36,11 @@ import {
   refreshWidgetByFilePath,
 } from './iframe-widget';
 import { MarimoSidebar } from './sidebar';
-import { FACTORY_NAME, MarimoWidgetFactory } from './widget-factory';
+import {
+  FACTORY_NAME,
+  type MarimoDocWidget,
+  MarimoWidgetFactory,
+} from './widget-factory';
 
 import '../style/base.css';
 
@@ -50,6 +55,12 @@ const CommandIDs = {
   copyAppLink: 'marimo:copy-app-link',
   newNotebookInFolder: 'marimo:new-notebook-in-folder',
 } as const;
+
+/**
+ * The JupyterLab command that opens a path with a given document factory.
+ * Used both to open marimo notebooks and to reopen them on layout restore.
+ */
+const DOCUMENT_OPEN_COMMAND = 'docmanager:open';
 
 /**
  * Get the base URL for the Marimo proxy.
@@ -98,6 +109,27 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // Register the Marimo file type for _mo.py files
     app.docRegistry.addFileType(marimoFileType);
+
+    /**
+     * Open a file in the marimo editor via the document registry.
+     */
+    async function openMarimoDocument(filePath: string): Promise<void> {
+      await commands.execute(DOCUMENT_OPEN_COMMAND, {
+        path: filePath,
+        factory: FACTORY_NAME,
+      });
+    }
+
+    /**
+     * Open the marimo editor on a notebook that has no file yet.
+     */
+    function openScratchNotebook(): void {
+      const widget = createMarimoWidget(marimoBaseUrl, {
+        label: 'New Notebook',
+      });
+      shell.add(widget, 'main');
+      shell.activateById(widget.id);
+    }
 
     // Shared helper: prompt for filename and create a notebook stub in the given directory
     async function createNotebookAt(
@@ -209,9 +241,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           continue;
         }
 
-        const widget = createMarimoWidget(marimoBaseUrl, { filePath });
-        shell.add(widget, 'main');
-        shell.activateById(widget.id);
+        await openMarimoDocument(filePath);
         done = true;
       }
     }
@@ -225,14 +255,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         const path = getSelectedFilePath(fileBrowserFactory);
         return path !== null && (isPythonFile(path) || isMarimoFile(path));
       },
-      execute: () => {
+      execute: async () => {
         const filePath = getSelectedFilePath(fileBrowserFactory);
         if (!filePath) {
           return;
         }
-        const widget = createMarimoWidget(marimoBaseUrl, { filePath });
-        shell.add(widget, 'main');
-        shell.activateById(widget.id);
+        await openMarimoDocument(filePath);
       },
     });
 
@@ -294,11 +322,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
 
           // Open the converted file in marimo
-          const widget = createMarimoWidget(marimoBaseUrl, {
-            filePath: outputPath,
-          });
-          shell.add(widget, 'main');
-          shell.activateById(widget.id);
+          await openMarimoDocument(outputPath);
         } catch (error) {
           showErrorMessage(
             'Conversion failed',
@@ -342,11 +366,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
-              const widget = createMarimoWidget(marimoBaseUrl, {
-                label: 'New Notebook',
-              });
-              shell.add(widget, 'main');
-              shell.activateById(widget.id);
+              openScratchNotebook();
             }
             return;
           }
@@ -387,11 +407,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
-              const widget = createMarimoWidget(marimoBaseUrl, {
-                label: 'New Notebook',
-              });
-              shell.add(widget, 'main');
-              shell.activateById(widget.id);
+              openScratchNotebook();
             }
             return;
           }
@@ -421,22 +437,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           // If Default selected and at root, open marimo directly
           if (!venv && !cwd) {
-            const widget = createMarimoWidget(marimoBaseUrl, {
-              label: 'New Notebook',
-            });
-            shell.add(widget, 'main');
-            shell.activateById(widget.id);
+            openScratchNotebook();
             return;
           }
 
           await createNotebookAt(cwd, venv);
         } catch {
           // Fall back to opening marimo directly on any error
-          const widget = createMarimoWidget(marimoBaseUrl, {
-            label: 'New Notebook',
-          });
-          shell.add(widget, 'main');
-          shell.activateById(widget.id);
+          openScratchNotebook();
         }
       },
     });
@@ -651,6 +659,28 @@ const plugin: JupyterFrontEndPlugin<void> = {
       defaultFor: ['marimo'], // Default for _mo.py files, "Open With" for .py files
     });
     app.docRegistry.addWidgetFactory(widgetFactory);
+
+    // Track the tabs the factory opens. Without a tracker registered with the
+    // layout restorer, JupyterLab has no record of these widgets and drops
+    // them on reload, while .ipynb tabs (whose plugin does register one) come
+    // back.
+    const documentTracker = new WidgetTracker<MarimoDocWidget>({
+      namespace: 'marimo-documents',
+    });
+    widgetFactory.widgetCreated.connect((_factory, widget) => {
+      void documentTracker.add(widget);
+    });
+
+    if (restorer) {
+      void restorer.restore(documentTracker, {
+        command: DOCUMENT_OPEN_COMMAND,
+        args: (widget) => ({
+          path: widget.context.path,
+          factory: FACTORY_NAME,
+        }),
+        name: (widget) => widget.context.path,
+      });
+    }
   },
 };
 

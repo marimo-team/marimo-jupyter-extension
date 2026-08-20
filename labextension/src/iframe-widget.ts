@@ -212,39 +212,30 @@ export function createMarimoIFrame(
 /**
  * Create a marimo widget that embeds the editor in an iframe.
  * Uses createMarimoIFrame internally for consistent IFrame creation.
+ *
+ * Only for notebooks with no file behind them yet; file-backed notebooks open
+ * through MarimoWidgetFactory.
  */
 export function createMarimoWidget(
   baseUrl: string,
-  options: { filePath?: string; label?: string } = {},
+  options: { label?: string } = {},
 ): MainAreaWidget<IFrame> {
-  const { filePath, label } = options;
-
   // Use centralized IFrame creation
   const {
     iframe: content,
     url: finalUrl,
     initId,
-  } = createMarimoIFrame(baseUrl, { filePath });
+  } = createMarimoIFrame(baseUrl);
 
   const widget = new MainAreaWidget({ content });
   widget.id = `marimo-${UUID.uuid4()}`;
-
-  if (label) {
-    widget.title.label = label;
-  } else if (filePath) {
-    const parts = filePath.split('/');
-    widget.title.label = parts[parts.length - 1] || 'marimo';
-  } else {
-    widget.title.label = 'marimo';
-  }
-
+  widget.title.label = options.label ?? 'marimo';
   widget.title.closable = true;
   widget.title.icon = leafIcon;
-  widget.title.caption = filePath ? `marimo: ${filePath}` : 'marimo Editor';
+  widget.title.caption = 'marimo Editor';
 
-  // Track widgets for disconnection handling
+  // Track by initializationId for disconnection handling
   if (initId) {
-    // New notebook - track by initializationId
     const widgetId = `marimo-widget-${UUID.uuid4()}`;
     widgetsByInitId.set(initId, {
       widget,
@@ -257,9 +248,6 @@ export function createMarimoWidget(
       widgetsByInitId.delete(initId);
     });
     initializeMessageListener();
-  } else if (filePath) {
-    // File-based notebook - track by filePath
-    registerWidgetForTracking(widget, filePath, finalUrl);
   }
 
   return widget;

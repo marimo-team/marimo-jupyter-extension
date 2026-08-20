@@ -63,6 +63,10 @@ When creating a new notebook, select from available Python environments. The ext
 - **Edit with marimo**: Right-click any `.py` or `_mo.py` file to open it in the marimo editor
 - **Convert to marimo**: Right-click any `.ipynb` file to convert it to marimo format
 
+### Tab Restoration
+
+Marimo notebooks that have been saved to a file are reopened when the JupyterLab page reloads, the same way `.ipynb` tabs are.
+
 ## Installation
 
 See [Installation Guide](https://marimo-team.github.io/marimo-jupyter-extension/installation/) for detailed setup instructions.
