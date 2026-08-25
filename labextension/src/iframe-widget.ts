@@ -2,6 +2,7 @@ import { IFrame, MainAreaWidget } from '@jupyterlab/apputils';
 import { UUID } from '@lumino/coreutils';
 import type { ISignal } from '@lumino/signaling';
 import { leafIcon } from './icons';
+import { buildMarimoUrl } from './scratch-notebook';
 
 /**
  * Sandbox settings for marimo IFrames.
@@ -48,6 +49,13 @@ export function getWidgetByFilePath(
   filePath: string,
 ): MainAreaWidget<IFrame> | undefined {
   return widgetsByFilePath.get(filePath)?.widget;
+}
+
+/** Get an existing scratch widget for an initialization ID, if one exists. */
+export function getWidgetByInitializationId(
+  initializationId: string,
+): MainAreaWidget<IFrame> | undefined {
+  return widgetsByInitId.get(initializationId)?.widget;
 }
 
 /**
@@ -188,7 +196,12 @@ export interface MarimoIFrameResult {
  */
 export function createMarimoIFrame(
   baseUrl: string,
-  options: { filePath?: string; initId?: string } = {},
+  options: {
+    filePath?: string;
+    initId?: string;
+    sessionId?: string;
+    kiosk?: boolean;
+  } = {},
 ): MarimoIFrameResult {
   const iframe = new IFrame({
     sandbox: IFRAME_SANDBOX_SETTINGS,
@@ -201,12 +214,23 @@ export function createMarimoIFrame(
     : (options.initId ?? `__new__${UUID.uuid4()}`);
 
   // Build URL: file-based uses encoded filePath, new notebooks use initId
-  const url = options.filePath
-    ? `${baseUrl}?file=${encodeURIComponent(options.filePath)}`
-    : `${baseUrl}?file=${initId}`;
+  const url = buildMarimoUrl(baseUrl, options.filePath ?? initId ?? '', {
+    sessionId: options.sessionId,
+    kiosk: options.kiosk,
+  });
 
   iframe.url = url;
   return { iframe, url, initId };
+}
+
+/** A restorable marimo notebook that does not yet have a file. */
+export class MarimoScratchWidget extends MainAreaWidget<IFrame> {
+  constructor(content: IFrame, initializationId: string) {
+    super({ content });
+    this.initializationId = initializationId;
+  }
+
+  readonly initializationId: string;
 }
 
 /**
@@ -218,37 +242,48 @@ export function createMarimoIFrame(
  */
 export function createMarimoWidget(
   baseUrl: string,
-  options: { label?: string } = {},
-): MainAreaWidget<IFrame> {
+  options: {
+    label?: string;
+    initId?: string;
+    sessionId?: string;
+    kiosk?: boolean;
+  } = {},
+): MarimoScratchWidget {
   // Use centralized IFrame creation
   const {
     iframe: content,
     url: finalUrl,
     initId,
-  } = createMarimoIFrame(baseUrl);
+  } = createMarimoIFrame(baseUrl, {
+    initId: options.initId,
+    sessionId: options.sessionId,
+    kiosk: options.kiosk,
+  });
 
-  const widget = new MainAreaWidget({ content });
-  widget.id = `marimo-${UUID.uuid4()}`;
+  if (initId === null) {
+    throw new Error('Scratch notebooks require an initialization ID');
+  }
+
+  const widget = new MarimoScratchWidget(content, initId);
+  widget.id = `marimo-${initId}`;
   widget.title.label = options.label ?? 'marimo';
   widget.title.closable = true;
   widget.title.icon = leafIcon;
   widget.title.caption = 'marimo Editor';
 
   // Track by initializationId for disconnection handling
-  if (initId) {
-    const widgetId = `marimo-widget-${UUID.uuid4()}`;
-    widgetsByInitId.set(initId, {
-      widget,
-      originalUrl: finalUrl,
-      widgetId,
-      wasConnected: false,
-      isNewNotebook: true,
-    });
-    widget.disposed.connect(() => {
-      widgetsByInitId.delete(initId);
-    });
-    initializeMessageListener();
-  }
+  const widgetId = `marimo-widget-${UUID.uuid4()}`;
+  widgetsByInitId.set(initId, {
+    widget,
+    originalUrl: finalUrl,
+    widgetId,
+    wasConnected: false,
+    isNewNotebook: true,
+  });
+  widget.disposed.connect(() => {
+    widgetsByInitId.delete(initId);
+  });
+  initializeMessageListener();
 
   return widget;
 }

@@ -5,18 +5,15 @@ import type { Message } from '@lumino/messaging';
 import { Widget } from '@lumino/widgets';
 import { marimoIcon } from './icons';
 import { updateWidgetTitles } from './iframe-widget';
+import {
+  fetchRunningSessions,
+  OPEN_RUNNING_SESSION_COMMAND,
+  type RunningSession,
+} from './scratch-notebook';
 
 const SIDEBAR_CLASS = 'jp-MarimoSidebar';
 const POLL_INTERVAL_MS = 5000;
 const HEALTH_FETCH_TIMEOUT_MS = 15000;
-
-interface RunningSession {
-  sessionId: string;
-  name: string;
-  path: string;
-  initializationId: string;
-  lastModified: number;
-}
 
 interface HealthStatus {
   process_alive: boolean;
@@ -146,19 +143,10 @@ export class MarimoSidebar extends Widget {
   private async _refreshSessions(): Promise<void> {
     try {
       const baseUrl = this._getMarimoBaseUrl();
-      const response = await fetch(`${baseUrl}api/home/running_notebooks`, {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      if (response.ok) {
-        const data = (await response.json()) as {
-          files?: RunningSession[];
-        };
-        const sessions = data.files ?? [];
-        this._updateSessionsList(sessions);
-        // Update widget tab titles based on session names
-        updateWidgetTitles(sessions);
-      }
+      const sessions = await fetchRunningSessions(baseUrl);
+      this._updateSessionsList(sessions);
+      // Update widget tab titles based on session names
+      updateWidgetTitles(sessions);
     } catch {
       // Silently fail - server may not be running
     }
@@ -360,8 +348,19 @@ export class MarimoSidebar extends Widget {
       const sessionItem = document.createElement('div');
       sessionItem.className = 'jp-MarimoSidebar-sessionItem';
 
-      const sessionInfo = document.createElement('div');
+      const sessionInfo = document.createElement('button');
       sessionInfo.className = 'jp-MarimoSidebar-sessionInfo';
+      sessionInfo.type = 'button';
+      sessionInfo.title = `Open ${session.name}`;
+      sessionInfo.addEventListener('click', () => {
+        void this._commands.execute(OPEN_RUNNING_SESSION_COMMAND, {
+          sessionId: session.sessionId,
+          name: session.name,
+          path: session.path,
+          initializationId: session.initializationId,
+          lastModified: session.lastModified,
+        });
+      });
 
       const sessionName = document.createElement('span');
       sessionName.className = 'jp-MarimoSidebar-sessionName';
@@ -373,8 +372,10 @@ export class MarimoSidebar extends Widget {
       killButton.className = 'jp-MarimoSidebar-killButton';
       killButton.innerHTML = '&times;';
       killButton.title = 'Shutdown session';
-      killButton.addEventListener('click', () => {
-        this._shutdownSession(session.sessionId);
+      killButton.setAttribute('aria-label', `Shutdown ${session.name}`);
+      killButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        void this._shutdownSession(session.sessionId);
       });
 
       sessionItem.appendChild(sessionInfo);
