@@ -19,6 +19,7 @@ import { KernelSpecAPI, ServerConnection } from '@jupyterlab/services';
 
 import { runIcon } from '@jupyterlab/ui-components';
 import {
+  isMarkdownFile,
   isPythonFile,
   isNotebookFile,
   isMarimoFile,
@@ -290,7 +291,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
         }
 
         filename = filename.replace(/[ -]/g, '_');
-        if (!filename.endsWith('.py') && !filename.endsWith('.md')) {
+        if (isMarkdownFile(filename)) {
+          await showErrorMessage(
+            'Unsupported Filename',
+            'Markdown notebooks are not supported. Use a .py filename.',
+          );
+          continue;
+        }
+        if (!filename.endsWith('.py')) {
           filename += '.py';
         }
 

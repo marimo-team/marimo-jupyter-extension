@@ -9,6 +9,13 @@ export function isPythonFile(path: string): boolean {
 }
 
 /**
+ * Check if a file path is a Markdown notebook.
+ */
+export function isMarkdownFile(path: string): boolean {
+  return path.endsWith('.md') || path.endsWith('.qmd');
+}
+
+/**
  * Check if a file path is a Jupyter notebook.
  */
 export function isNotebookFile(path: string): boolean {

@@ -257,6 +257,15 @@ class CreateStubHandler(JupyterHandler):
             self.set_status(400)
             self.finish({"success": False, "error": "Missing path"})
             return
+        if not isinstance(path, str) or not path.endswith(".py"):
+            self.set_status(400)
+            self.finish(
+                {
+                    "success": False,
+                    "error": "Notebook filename must end in .py",
+                }
+            )
+            return
 
         # Build stub content
         lines = []

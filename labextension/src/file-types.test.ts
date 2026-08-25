@@ -6,11 +6,24 @@ vi.mock('./icons', () => ({
 }));
 
 import {
+  isMarkdownFile,
   isMarimoFile,
   isNotebookFile,
   isPythonFile,
   marimoFileType,
 } from './file-types';
+
+describe('isMarkdownFile', () => {
+  it('returns true for Markdown notebook extensions', () => {
+    expect(isMarkdownFile('notebook.md')).toBe(true);
+    expect(isMarkdownFile('path/to/notebook.qmd')).toBe(true);
+  });
+
+  it('returns false for other extensions', () => {
+    expect(isMarkdownFile('notebook.py')).toBe(false);
+    expect(isMarkdownFile('notebook.md.bak')).toBe(false);
+  });
+});
 
 describe('isPythonFile', () => {
   it('returns true for .py files', () => {
