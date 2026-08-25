@@ -537,6 +537,22 @@ class TestCreateStubHandler:
             {"success": False, "error": "Missing path"}
         )
 
+    def test_rejects_markdown_filename(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = Path(tmpdir) / "out.md"
+            handler = self._build({"path": str(stub_path)})
+
+            _run(handler, "post")
+
+            handler.set_status.assert_called_once_with(400)
+            handler.finish.assert_called_once_with(
+                {
+                    "success": False,
+                    "error": "Notebook filename must end in .py",
+                }
+            )
+            assert not stub_path.exists()
+
 
 class TestLoadDefaultFile:
     """`_load_default_file` reads the configured template once."""
