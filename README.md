@@ -39,7 +39,8 @@ Launch JupyterLab and click the marimo icon in the launcher, or use the sidebar 
 
 ### Launcher & Sidebar
 
-Create new marimo notebooks from the launcher. The sidebar shows server status, running sessions with kill buttons, and quick actions.
+Create new marimo notebooks from the launcher. The sidebar shows server status,
+clickable running sessions with separate shutdown buttons, and quick actions.
 
 <p align="center">
   <img src="screenshot.png" width="800px" alt="marimo extension sidebar and editor">
@@ -65,7 +66,9 @@ When creating a new notebook, select from available Python environments. The ext
 
 ### Tab Restoration
 
-Marimo notebooks that have been saved to a file are reopened when the JupyterLab page reloads, the same way `.ipynb` tabs are.
+Saved marimo notebooks and live unsaved notebooks are reopened when the
+JupyterLab page reloads. Unsaved notebooks reconnect to their existing marimo
+session. If that session has ended, the stale tab is discarded.
 
 ## Installation
 

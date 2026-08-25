@@ -192,7 +192,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px;
+  padding: 0;
   background: var(--jp-layout-color2);
   border-radius: 4px;
   border: 1px solid var(--jp-border-color2);
@@ -202,6 +202,19 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.jp-MarimoSidebar-sessionInfo:hover,
+.jp-MarimoSidebar-sessionInfo:focus-visible {
+  background: var(--jp-layout-color3);
+  outline: none;
 }
 
 .jp-MarimoSidebar-sessionName {
@@ -220,7 +233,8 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: bold;
-  padding: 0 4px;
+  margin: 0 6px;
+  padding: 2px 5px;
   line-height: 1;
   border-radius: 4px;
   flex-shrink: 0;

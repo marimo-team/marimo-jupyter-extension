@@ -33,8 +33,19 @@ import {
 import {
   createMarimoWidget,
   getWidgetByFilePath,
+  getWidgetByInitializationId,
+  type MarimoScratchWidget,
   refreshWidgetByFilePath,
 } from './iframe-widget';
+import {
+  createMarimoSessionId,
+  fetchRestorableScratchSessions,
+  getScratchInitializationId,
+  OPEN_RUNNING_SESSION_COMMAND,
+  resolveScratchSession,
+  takeOverScratchSession,
+  type RunningSession,
+} from './scratch-notebook';
 import { MarimoSidebar } from './sidebar';
 import {
   FACTORY_NAME,
@@ -54,6 +65,8 @@ const CommandIDs = {
   openEditor: 'marimo:open-editor',
   copyAppLink: 'marimo:copy-app-link',
   newNotebookInFolder: 'marimo:new-notebook-in-folder',
+  restoreScratchNotebook: 'marimo:restore-scratch-notebook',
+  openRunningSession: OPEN_RUNNING_SESSION_COMMAND,
 } as const;
 
 /**
@@ -68,6 +81,24 @@ const DOCUMENT_OPEN_COMMAND = 'docmanager:open';
 function getMarimoBaseUrl(): string {
   const baseUrl = PageConfig.getBaseUrl();
   return `${baseUrl}marimo/`;
+}
+
+/** Check proxy process state without spawning marimo. */
+async function isMarimoProcessAlive(): Promise<boolean> {
+  const settings = ServerConnection.makeSettings();
+  const response = await ServerConnection.makeRequest(
+    `${settings.baseUrl}marimo-tools/health`,
+    { method: 'GET' },
+    settings,
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to check marimo process (${response.status})`);
+  }
+  const data = (await response.json()) as { process_alive?: unknown };
+  if (typeof data.process_alive !== 'boolean') {
+    throw new Error('Invalid marimo health response');
+  }
+  return data.process_alive;
 }
 
 /**
@@ -106,6 +137,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
   ) => {
     const { commands, shell } = app;
     const marimoBaseUrl = getMarimoBaseUrl();
+    const scratchTracker = new WidgetTracker<MarimoScratchWidget>({
+      namespace: 'marimo-scratch-notebooks',
+    });
+    let restorableScratchSessions: RunningSession[] | null = null;
 
     // Register the Marimo file type for _mo.py files
     app.docRegistry.addFileType(marimoFileType);
@@ -123,12 +158,108 @@ const plugin: JupyterFrontEndPlugin<void> = {
     /**
      * Open the marimo editor on a notebook that has no file yet.
      */
-    function openScratchNotebook(): void {
+    async function openScratchNotebook(
+      options: {
+        initId?: string;
+        label?: string;
+        activate?: boolean;
+        recover?: boolean;
+      } = {},
+    ): Promise<MarimoScratchWidget> {
+      const recoverySessionId = options.recover
+        ? createMarimoSessionId()
+        : undefined;
       const widget = createMarimoWidget(marimoBaseUrl, {
-        label: 'New Notebook',
+        initId: options.initId,
+        sessionId: recoverySessionId,
+        kiosk: options.recover,
+        label: options.label ?? 'New Notebook',
       });
+
       shell.add(widget, 'main');
-      shell.activateById(widget.id);
+      await scratchTracker.add(widget);
+      if (options.recover && recoverySessionId && options.initId) {
+        void takeOverScratchSession(
+          marimoBaseUrl,
+          options.initId,
+          recoverySessionId,
+        ).catch(() => {
+          Notification.warning(
+            'Notebook recovered read-only. Select “Take over” to edit it.',
+          );
+        });
+      }
+      if (options.activate !== false) {
+        shell.activateById(widget.id);
+      }
+      return widget;
+    }
+
+    commands.addCommand(CommandIDs.restoreScratchNotebook, {
+      execute: async (args) => {
+        const initializationId = getScratchInitializationId(args);
+        if (restorableScratchSessions === null) {
+          throw new Error('Running sessions are not available');
+        }
+        const session = resolveScratchSession(
+          restorableScratchSessions,
+          initializationId,
+        );
+        return openScratchNotebook({
+          initId: initializationId,
+          label: session.name || 'New Notebook',
+          activate: false,
+          recover: true,
+        });
+      },
+    });
+
+    commands.addCommand(CommandIDs.openRunningSession, {
+      execute: async (args) => {
+        const session = args as Partial<RunningSession>;
+        if (
+          typeof session.path !== 'string' ||
+          typeof session.name !== 'string' ||
+          typeof session.initializationId !== 'string'
+        ) {
+          throw new Error('Invalid running session');
+        }
+
+        if (session.initializationId.startsWith('__new__')) {
+          const existing = getWidgetByInitializationId(
+            session.initializationId,
+          );
+          if (existing) {
+            shell.activateById(existing.id);
+            return existing;
+          }
+          return openScratchNotebook({
+            initId: session.initializationId,
+            label: session.name || 'New Notebook',
+            recover: true,
+          });
+        }
+
+        await openMarimoDocument(session.path);
+        return undefined;
+      },
+    });
+
+    if (restorer) {
+      const sessionsReady = fetchRestorableScratchSessions(
+        marimoBaseUrl,
+        isMarimoProcessAlive,
+      ).then((sessions) => {
+        restorableScratchSessions = sessions;
+      });
+      void restorer.restore(scratchTracker, {
+        command: CommandIDs.restoreScratchNotebook,
+        args: (widget) => ({
+          initializationId: widget.initializationId,
+        }),
+        name: (widget) => widget.initializationId,
+        when: sessionsReady,
+      });
     }
 
     // Shared helper: prompt for filename and create a notebook stub in the given directory
@@ -366,7 +497,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
-              openScratchNotebook();
+              await openScratchNotebook();
             }
             return;
           }
@@ -407,7 +538,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
-              openScratchNotebook();
+              await openScratchNotebook();
             }
             return;
           }
@@ -437,14 +568,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           // If Default selected and at root, open marimo directly
           if (!venv && !cwd) {
-            openScratchNotebook();
+            await openScratchNotebook();
             return;
           }
 
           await createNotebookAt(cwd, venv);
         } catch {
           // Fall back to opening marimo directly on any error
-          openScratchNotebook();
+          await openScratchNotebook();
         }
       },
     });
