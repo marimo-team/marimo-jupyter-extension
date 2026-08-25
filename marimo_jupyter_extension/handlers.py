@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path, PurePath, PureWindowsPath
 
+from jupyter_core.utils import ensure_async
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.utils import url_path_join
 from tornado import web
@@ -265,11 +266,12 @@ class CreateStubHandler(JupyterHandler):
         # Add PEP 723 header if venv is specified
         if venv:
             venv_path = _venv_directory(venv)
+            quoted_venv_path = json.dumps(str(venv_path), ensure_ascii=False)
             lines.extend(
                 [
                     "# /// script",
                     "# [tool.marimo.venv]",
-                    f'# path = "{venv_path}"',
+                    f"# path = {quoted_venv_path}",
                     "# ///",
                     "",
                 ]
@@ -511,6 +513,38 @@ def _get_notebook_venv(content: str) -> str | None:
 class SetVenvHandler(JupyterHandler):
     """Handler for changing a saved marimo notebook's environment."""
 
+    async def _read_notebook(self, path: str) -> str:
+        model = await ensure_async(
+            self.contents_manager.get(
+                path=path,
+                type="file",
+                format="text",
+                content=True,
+            )
+        )
+        content = model.get("content")
+        if not isinstance(content, str):
+            raise web.HTTPError(400, "Notebook is not a text file")
+        return content
+
+    async def _save_notebook(self, path: str, content: str) -> None:
+        await ensure_async(
+            self.contents_manager.save(
+                {"type": "file", "format": "text", "content": content},
+                path,
+            )
+        )
+
+    def _finish_contents_error(self, error: web.HTTPError) -> None:
+        status = error.status_code
+        message = (
+            "Notebook not found"
+            if status == 404
+            else error.get_message() or error.reason or str(error)
+        )
+        self.set_status(status)
+        self.finish({"success": False, "error": message})
+
     @web.authenticated
     async def get(self):
         """Return the currently configured environment for a notebook."""
@@ -521,12 +555,10 @@ class SetVenvHandler(JupyterHandler):
             return
 
         try:
-            with Path(path).open(encoding="utf-8", newline="") as file:
-                content = file.read()
+            content = await self._read_notebook(path)
             self.finish({"success": True, "venv": _get_notebook_venv(content)})
-        except FileNotFoundError:
-            self.set_status(404)
-            self.finish({"success": False, "error": "Notebook not found"})
+        except web.HTTPError as e:
+            self._finish_contents_error(e)
         except ValueError as e:
             self.set_status(400)
             self.finish({"success": False, "error": str(e)})
@@ -541,7 +573,18 @@ class SetVenvHandler(JupyterHandler):
         POST /marimo-tools/set-venv
         Body: {"path": "notebook.py", "venv": "/path/to/python" | null}
         """
-        data = json.loads(self.request.body)
+        try:
+            data = json.loads(self.request.body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self.set_status(400)
+            self.finish({"success": False, "error": "Invalid JSON body"})
+            return
+        if not isinstance(data, dict):
+            self.set_status(400)
+            self.finish(
+                {"success": False, "error": "JSON body must be an object"}
+            )
+            return
         path = data.get("path")
         venv = data.get("venv")
 
@@ -566,13 +609,10 @@ class SetVenvHandler(JupyterHandler):
             self.finish({"success": False, "error": "Invalid venv"})
             return
 
-        file_path = Path(path)
         try:
-            with file_path.open(encoding="utf-8", newline="") as file:
-                content = file.read()
+            content = await self._read_notebook(path)
             updated = _set_notebook_venv(content, venv)
-            with file_path.open("w", encoding="utf-8", newline="") as file:
-                file.write(updated)
+            await self._save_notebook(path, updated)
             self.finish(
                 {
                     "success": True,
@@ -580,9 +620,8 @@ class SetVenvHandler(JupyterHandler):
                     "venv": str(_venv_directory(venv)) if venv else None,
                 }
             )
-        except FileNotFoundError:
-            self.set_status(404)
-            self.finish({"success": False, "error": "Notebook not found"})
+        except web.HTTPError as e:
+            self._finish_contents_error(e)
         except ValueError as e:
             self.set_status(400)
             self.finish({"success": False, "error": str(e)})

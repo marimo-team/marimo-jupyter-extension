@@ -547,37 +547,55 @@ class TestSetNotebookVenv:
 
 
 class TestSetVenvHandler:
-    def _build(self, body):
+    def _build(self, body, *, content="import marimo\n"):
         from marimo_jupyter_extension.handlers import SetVenvHandler
 
-        handler = _make_handler(SetVenvHandler)
-        handler.request = SimpleNamespace(body=json.dumps(body).encode())
-        return handler
+        contents_manager = MagicMock()
+        contents_manager.get.return_value = {
+            "type": "file",
+            "format": "text",
+            "content": content,
+        }
+        application = SimpleNamespace(
+            settings={"contents_manager": contents_manager}
+        )
+        handler = _make_handler(SetVenvHandler, application=application)
+        request_body = (
+            body if isinstance(body, bytes) else json.dumps(body).encode()
+        )
+        handler.request = SimpleNamespace(body=request_body)
+        return handler, contents_manager
 
     def test_updates_notebook(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            notebook = Path(tmpdir) / "notebook.py"
-            notebook.write_text("import marimo\n")
-            handler = self._build(
-                {
-                    "path": str(notebook),
-                    "venv": "/srv/envs/project/bin/python",
-                }
-            )
+        handler, contents_manager = self._build(
+            {
+                "path": "notebook.py",
+                "venv": "/srv/envs/project/bin/python",
+            }
+        )
 
-            _run(handler, "post")
+        _run(handler, "post")
 
-            handler.finish.assert_called_once_with(
-                {
-                    "success": True,
-                    "path": str(notebook),
-                    "venv": "/srv/envs/project",
-                }
-            )
-            assert '# path = "/srv/envs/project"\n' in notebook.read_text()
+        handler.finish.assert_called_once_with(
+            {
+                "success": True,
+                "path": "notebook.py",
+                "venv": "/srv/envs/project",
+            }
+        )
+        saved_model, saved_path = contents_manager.save.call_args.args
+        assert saved_path == "notebook.py"
+        assert saved_model["type"] == "file"
+        assert saved_model["format"] == "text"
+        assert '# path = "/srv/envs/project"\n' in saved_model["content"]
 
     def test_missing_notebook_returns_404(self):
-        handler = self._build({"path": "/missing/notebook.py", "venv": None})
+        from tornado import web
+
+        handler, contents_manager = self._build(
+            {"path": "missing.py", "venv": None}
+        )
+        contents_manager.get.side_effect = web.HTTPError(404)
 
         _run(handler, "post")
 
@@ -586,8 +604,51 @@ class TestSetVenvHandler:
             {"success": False, "error": "Notebook not found"}
         )
 
+    def test_contents_manager_rejects_path_outside_root(self):
+        from tornado import web
+
+        handler, contents_manager = self._build(
+            {"path": "../outside.py", "venv": None}
+        )
+        contents_manager.get.side_effect = web.HTTPError(
+            403, "Path is outside the contents root"
+        )
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(403)
+        handler.finish.assert_called_once_with(
+            {
+                "success": False,
+                "error": "Path is outside the contents root",
+            }
+        )
+        contents_manager.save.assert_not_called()
+
+    def test_malformed_json_returns_400(self):
+        handler, _contents_manager = self._build(b"{not-json")
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "Invalid JSON body"}
+        )
+
+    def test_json_body_must_be_an_object(self):
+        handler, _contents_manager = self._build([])
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "JSON body must be an object"}
+        )
+
     def test_rejects_non_python_files(self):
-        handler = self._build({"path": "notebook.md", "venv": None})
+        handler, _contents_manager = self._build(
+            {"path": "notebook.md", "venv": None}
+        )
 
         _run(handler, "post")
 
@@ -600,22 +661,25 @@ class TestSetVenvHandler:
         )
 
     def test_get_returns_current_environment(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            notebook = Path(tmpdir) / "notebook.py"
-            notebook.write_text(
+        handler, contents_manager = self._build(
+            {},
+            content=(
                 "# /// script\n"
                 "# [tool.marimo.venv]\n"
                 '# path = "/srv/envs/project"\n'
                 "# ///\n"
-            )
-            handler = self._build({})
-            handler.get_argument = MagicMock(return_value=str(notebook))
+            ),
+        )
+        handler.get_argument = MagicMock(return_value="notebook.py")
 
-            _run(handler, "get")
+        _run(handler, "get")
 
-            handler.finish.assert_called_once_with(
-                {"success": True, "venv": "/srv/envs/project"}
-            )
+        handler.finish.assert_called_once_with(
+            {"success": True, "venv": "/srv/envs/project"}
+        )
+        contents_manager.get.assert_called_once_with(
+            path="notebook.py", type="file", format="text", content=True
+        )
 
 
 class TestCreateStubHandler:
@@ -723,6 +787,21 @@ class TestCreateStubHandler:
             assert content.startswith("# /// script\n")
             assert '# path = "/srv/envs/proj"\n' in content
             assert content.endswith(template)
+
+    def test_windows_venv_path_is_toml_escaped(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build(
+                {
+                    "path": stub_path,
+                    "venv": r"C:\Users\me\venv\Scripts\python.exe",
+                }
+            )
+
+            _run(handler, "post")
+
+            content = Path(stub_path).read_text()
+            assert '# path = "C:\\\\Users\\\\me\\\\venv"\n' in content
 
     def test_no_duplicate_pep723_when_template_has_block(self, clean_env):
         """A template carrying its own PEP 723 block + a venv request
