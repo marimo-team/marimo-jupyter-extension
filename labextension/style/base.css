@@ -209,12 +209,17 @@
   font-family: inherit;
   padding: 7px 8px;
   text-align: left;
+  border-radius: 3px 0 0 3px;
 }
 
-.jp-MarimoSidebar-sessionInfo:hover,
+.jp-MarimoSidebar-sessionInfo:hover {
+  background: var(--jp-layout-color3);
+}
+
 .jp-MarimoSidebar-sessionInfo:focus-visible {
   background: var(--jp-layout-color3);
-  outline: none;
+  outline: 2px solid var(--jp-brand-color1);
+  outline-offset: -2px;
 }
 
 .jp-MarimoSidebar-sessionName {
@@ -231,10 +236,15 @@
   border: none;
   color: var(--jp-ui-font-color2);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 16px;
   font-weight: bold;
   margin: 0 6px;
-  padding: 2px 5px;
+  padding: 0;
+  min-width: 24px;
+  min-height: 24px;
   line-height: 1;
   border-radius: 4px;
   flex-shrink: 0;
@@ -243,6 +253,11 @@
 .jp-MarimoSidebar-killButton:hover {
   background: var(--jp-error-color2);
   color: var(--jp-ui-inverse-font-color0);
+}
+
+.jp-MarimoSidebar-killButton:focus-visible {
+  outline: 2px solid var(--jp-brand-color1);
+  outline-offset: 1px;
 }
 
 .jp-MarimoSidebar-emptyMessage {
