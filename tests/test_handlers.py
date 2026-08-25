@@ -8,6 +8,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _make_handler(handler_cls, *, application=None):
     """Build a handler instance bypassing Tornado's initializer."""
@@ -375,6 +377,381 @@ class TestStripLeadingPep723:
         assert _strip_leading_pep723(text) == text
 
 
+class TestSetNotebookVenv:
+    def test_adds_metadata_to_notebook_without_block(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = "import marimo\napp = marimo.App()\n"
+        updated = _set_notebook_venv(
+            content, "/srv/envs/project/bin/python3.12"
+        )
+
+        assert updated.startswith(
+            "# /// script\n"
+            "# [tool.marimo.venv]\n"
+            '# path = "/srv/envs/project"\n'
+            "# ///\n\n"
+        )
+        assert updated.endswith(content)
+
+    def test_adds_metadata_after_shebang_and_encoding_cookie(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\nimport marimo\n"
+        )
+
+        updated = _set_notebook_venv(content, "/env/bin/python")
+
+        assert updated.startswith(
+            "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n# /// script\n"
+        )
+
+    def test_preserves_crlf_line_endings(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            "# /// script\r\n"
+            "# [tool.marimo.venv]\r\n"
+            '# path = "/old"\r\n'
+            "# ///\r\n"
+            "import marimo\r\n"
+        )
+
+        updated = _set_notebook_venv(content, "/new/bin/python")
+
+        assert '# path = "/new"\r\n' in updated
+        assert updated.count("\n") == updated.count("\r\n")
+
+    def test_updates_path_without_reformatting_other_metadata(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            "# /// script\n"
+            '# dependencies = ["polars"]\n'
+            "# [tool.marimo.venv]\n"
+            '# path = "/old/environment"\n'
+            "# writable = true\n"
+            "# [tool.marimo.runtime]\n"
+            "# output_max_bytes = 10_000 # Keep this comment.\n"
+            "# ///\n"
+            "import marimo\n"
+        )
+
+        updated = _set_notebook_venv(content, "/new/environment/bin/python")
+
+        assert '# path = "/new/environment"\n' in updated
+        assert '# path = "/old/environment"\n' not in updated
+        assert '# dependencies = ["polars"]\n' in updated
+        assert "# writable = true\n" in updated
+        assert "# output_max_bytes = 10_000 # Keep this comment.\n" in updated
+
+    def test_adds_venv_section_to_existing_metadata(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            '# /// script\n# dependencies = ["polars"]\n# ///\nimport marimo\n'
+        )
+
+        updated = _set_notebook_venv(content, "/env/bin/python")
+
+        assert updated == (
+            "# /// script\n"
+            '# dependencies = ["polars"]\n'
+            "# [tool.marimo.venv]\n"
+            '# path = "/env"\n'
+            "# ///\n"
+            "import marimo\n"
+        )
+
+    def test_clear_path_preserves_other_venv_settings(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            "# /// script\n"
+            "# [tool.marimo.venv]\n"
+            '# path = "/env"\n'
+            "# writable = true\n"
+            "# ///\n"
+            "import marimo\n"
+        )
+
+        updated = _set_notebook_venv(content, None)
+
+        assert "# [tool.marimo.venv]\n" in updated
+        assert "# writable = true\n" in updated
+        assert "# path =" not in updated
+
+    def test_clear_path_removes_empty_venv_section(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            "# /// script\n"
+            '# dependencies = ["polars"]\n'
+            "# [tool.marimo.venv]\n"
+            '# path = "/env"\n'
+            "# [tool.marimo.runtime]\n"
+            '# on_cell_change = "autorun"\n'
+            "# ///\n"
+            "import marimo\n"
+        )
+
+        updated = _set_notebook_venv(content, None)
+
+        assert "# [tool.marimo.venv]\n" not in updated
+        assert "# [tool.marimo.runtime]\n" in updated
+        assert '# dependencies = ["polars"]\n' in updated
+
+    def test_windows_kernelspec_resolves_scripts_directory(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        updated = _set_notebook_venv(
+            "import marimo\n", r"C:\Users\me\venv\Scripts\python.exe"
+        )
+
+        assert '# path = "C:\\\\Users\\\\me\\\\venv"\n' in updated
+
+    def test_rejects_multiple_metadata_blocks(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = "# /// script\n# ///\n# /// script\n# ///\nimport marimo\n"
+
+        with pytest.raises(ValueError, match="Multiple PEP 723"):
+            _set_notebook_venv(content, "/env/bin/python")
+
+    def test_reads_configured_path(self):
+        from marimo_jupyter_extension.handlers import _get_notebook_venv
+
+        content = (
+            "# /// script\n"
+            "# [tool.marimo.venv]\n"
+            "# path = '/srv/envs/project'\n"
+            "# writable = true\n"
+            "# ///\n"
+            "import marimo\n"
+        )
+
+        assert _get_notebook_venv(content) == "/srv/envs/project"
+
+    def test_reads_json_quoted_path_with_comment(self):
+        from marimo_jupyter_extension.handlers import _get_notebook_venv
+
+        content = (
+            "# /// script\n"
+            "# [tool.marimo.venv]\n"
+            '# path = "/srv/envs/project" # selected in JupyterLab\n'
+            "# ///\n"
+        )
+
+        assert _get_notebook_venv(content) == "/srv/envs/project"
+
+
+class TestHasMarimoAppMarkers:
+    def test_uses_marimo_app_markers(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert _has_marimo_app_markers(
+            "import marimo\napp = marimo.App(width='medium')\n"
+        )
+
+    def test_requires_marimo_import_marker(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers("app = marimo.App()\n")
+
+    def test_import_marker_must_not_be_indented(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers(
+            "if True:\n    import marimo\n    marimo.App()\n"
+        )
+
+    def test_import_marker_requires_exact_module_name(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers(
+            "import marimo_tools\nmarimo.App()\n"
+        )
+
+    def test_requires_marimo_app_marker(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers("import marimo\nprint('hello')\n")
+
+
+class TestSetVenvHandler:
+    def _build(
+        self,
+        body,
+        *,
+        content="import marimo\napp = marimo.App()\n",
+    ):
+        from marimo_jupyter_extension.handlers import SetVenvHandler
+
+        contents_manager = MagicMock()
+        contents_manager.get.return_value = {
+            "type": "file",
+            "format": "text",
+            "content": content,
+        }
+        application = SimpleNamespace(
+            settings={"contents_manager": contents_manager}
+        )
+        handler = _make_handler(SetVenvHandler, application=application)
+        request_body = (
+            body if isinstance(body, bytes) else json.dumps(body).encode()
+        )
+        handler.request = SimpleNamespace(body=request_body)
+        return handler, contents_manager
+
+    def test_updates_notebook(self):
+        handler, contents_manager = self._build(
+            {
+                "path": "notebook.py",
+                "venv": "/srv/envs/project/bin/python",
+            }
+        )
+
+        _run(handler, "post")
+
+        handler.finish.assert_called_once_with(
+            {
+                "success": True,
+                "path": "notebook.py",
+                "venv": "/srv/envs/project",
+            }
+        )
+        saved_model, saved_path = contents_manager.save.call_args.args
+        assert saved_path == "notebook.py"
+        assert saved_model["type"] == "file"
+        assert saved_model["format"] == "text"
+        assert '# path = "/srv/envs/project"\n' in saved_model["content"]
+
+    def test_missing_notebook_returns_404(self):
+        from tornado import web
+
+        handler, contents_manager = self._build(
+            {"path": "missing.py", "venv": None}
+        )
+        contents_manager.get.side_effect = web.HTTPError(404)
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(404)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "Notebook not found"}
+        )
+
+    def test_contents_manager_rejects_path_outside_root(self):
+        from tornado import web
+
+        handler, contents_manager = self._build(
+            {"path": "../outside.py", "venv": None}
+        )
+        contents_manager.get.side_effect = web.HTTPError(
+            403, "Path is outside the contents root"
+        )
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(403)
+        handler.finish.assert_called_once_with(
+            {
+                "success": False,
+                "error": "Path is outside the contents root",
+            }
+        )
+        contents_manager.save.assert_not_called()
+
+    def test_malformed_json_returns_400(self):
+        handler, _contents_manager = self._build(b"{not-json")
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "Invalid JSON body"}
+        )
+
+    def test_json_body_must_be_an_object(self):
+        handler, _contents_manager = self._build([])
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "JSON body must be an object"}
+        )
+
+    def test_rejects_non_python_files(self):
+        handler, _contents_manager = self._build(
+            {"path": "notebook.md", "venv": None}
+        )
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {
+                "success": False,
+                "error": "Environment selection is only supported for Python notebooks",
+            }
+        )
+
+    def test_rejects_python_file_that_is_not_a_marimo_notebook(self):
+        handler, contents_manager = self._build(
+            {"path": "script.py", "venv": "/srv/env/bin/python"},
+            content="print('ordinary Python')\n",
+        )
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "File is not a marimo notebook"}
+        )
+        contents_manager.save.assert_not_called()
+
+    def test_get_identifies_non_marimo_python_file(self):
+        handler, _contents_manager = self._build(
+            {}, content="print('ordinary Python')\n"
+        )
+        handler.get_argument = MagicMock(return_value="script.py")
+
+        _run(handler, "get")
+
+        handler.finish.assert_called_once_with(
+            {"success": True, "isMarimo": False, "venv": None}
+        )
+
+    def test_get_returns_current_environment(self):
+        handler, contents_manager = self._build(
+            {},
+            content=(
+                "# /// script\n"
+                "# [tool.marimo.venv]\n"
+                '# path = "/srv/envs/project"\n'
+                "# ///\n"
+                "import marimo\n"
+                "app = marimo.App()\n"
+            ),
+        )
+        handler.get_argument = MagicMock(return_value="notebook.py")
+
+        _run(handler, "get")
+
+        handler.finish.assert_called_once_with(
+            {
+                "success": True,
+                "isMarimo": True,
+                "venv": "/srv/envs/project",
+            }
+        )
+        contents_manager.get.assert_called_once_with(
+            path="notebook.py", type="file", format="text", content=True
+        )
+
+
 class TestCreateStubHandler:
     """`CreateStubHandler.post` writes a marimo notebook stub to disk.
 
@@ -480,6 +857,21 @@ class TestCreateStubHandler:
             assert content.startswith("# /// script\n")
             assert '# path = "/srv/envs/proj"\n' in content
             assert content.endswith(template)
+
+    def test_windows_venv_path_is_toml_escaped(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stub_path = str(Path(tmpdir) / "out.py")
+            handler = self._build(
+                {
+                    "path": stub_path,
+                    "venv": r"C:\Users\me\venv\Scripts\python.exe",
+                }
+            )
+
+            _run(handler, "post")
+
+            content = Path(stub_path).read_text()
+            assert '# path = "C:\\\\Users\\\\me\\\\venv"\n' in content
 
     def test_no_duplicate_pep723_when_template_has_block(self, clean_env):
         """A template carrying its own PEP 723 block + a venv request

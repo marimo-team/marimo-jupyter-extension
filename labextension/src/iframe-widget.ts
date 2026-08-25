@@ -70,6 +70,14 @@ export function refreshWidgetByFilePath(filePath: string): void {
   }
 }
 
+/** Stop a file widget from reconnecting while its session is restarted. */
+export function disconnectWidgetByFilePath(filePath: string): void {
+  const tracked = widgetsByFilePath.get(filePath);
+  if (tracked) {
+    showDisconnectedPage(tracked);
+  }
+}
+
 /**
  * Generate a data URL containing the disconnected page HTML.
  */

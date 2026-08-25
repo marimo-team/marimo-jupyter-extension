@@ -33,6 +33,7 @@ import {
 } from './icons';
 import {
   createMarimoWidget,
+  disconnectWidgetByFilePath,
   getWidgetByFilePath,
   getWidgetByInitializationId,
   type MarimoScratchWidget,
@@ -40,6 +41,7 @@ import {
 } from './iframe-widget';
 import {
   createMarimoSessionId,
+  fetchRunningSessions,
   fetchRestorableScratchSessions,
   getScratchInitializationId,
   OPEN_RUNNING_SESSION_COMMAND,
@@ -65,6 +67,7 @@ const CommandIDs = {
   newNotebook: 'marimo:new-notebook',
   openEditor: 'marimo:open-editor',
   copyAppLink: 'marimo:copy-app-link',
+  changeEnvironment: 'marimo:change-environment',
   newNotebookInFolder: 'marimo:new-notebook-in-folder',
   restoreScratchNotebook: 'marimo:restore-scratch-notebook',
   openRunningSession: OPEN_RUNNING_SESSION_COMMAND,
@@ -119,6 +122,168 @@ function getSelectedFilePath(
   }
 
   return item.value.path;
+}
+
+interface PythonEnvironment {
+  name: string;
+  displayName: string;
+  pythonPath: string;
+}
+
+interface EnvironmentSelection {
+  accepted: boolean;
+  displayName: string;
+  venv: string | undefined;
+}
+
+async function getPythonEnvironments(): Promise<PythonEnvironment[]> {
+  const specs = await KernelSpecAPI.getSpecs();
+  const environments: PythonEnvironment[] = [];
+  if (!specs?.kernelspecs) {
+    return environments;
+  }
+
+  for (const [name, spec] of Object.entries(specs.kernelspecs)) {
+    if (spec?.language && spec.language.toLowerCase() !== 'python') {
+      continue;
+    }
+    const pythonPath = spec?.argv?.[0];
+    if (
+      !pythonPath ||
+      (!pythonPath.includes('/') && !pythonPath.includes('\\'))
+    ) {
+      continue;
+    }
+    environments.push({
+      name,
+      displayName: spec.display_name ?? name,
+      pythonPath,
+    });
+  }
+  return environments;
+}
+
+async function selectPythonEnvironment(
+  options: {
+    currentVenv?: string;
+    showDefaultOnly?: boolean;
+  } = {},
+): Promise<EnvironmentSelection> {
+  const environments = await getPythonEnvironments();
+  if (environments.length === 0 && !options.showDefaultOnly) {
+    return {
+      accepted: true,
+      displayName: 'Default',
+      venv: undefined,
+    };
+  }
+
+  const normalizeEnvironmentPath = (path: string): string => {
+    const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
+    const withoutInterpreter = normalized.replace(
+      /\/(?:bin|scripts)\/[^/]+$/i,
+      '',
+    );
+    return /^[a-z]:/i.test(withoutInterpreter)
+      ? withoutInterpreter.toLowerCase()
+      : withoutInterpreter;
+  };
+  let currentEnvironmentIndex = -1;
+  if (options.currentVenv) {
+    const currentPath = normalizeEnvironmentPath(options.currentVenv);
+    currentEnvironmentIndex = environments.findIndex(
+      (environment) =>
+        normalizeEnvironmentPath(environment.pythonPath) === currentPath,
+    );
+    if (currentEnvironmentIndex === -1) {
+      environments.push({
+        name: 'current',
+        displayName: `Current (${options.currentVenv})`,
+        pythonPath: options.currentVenv,
+      });
+      currentEnvironmentIndex = environments.length - 1;
+    }
+  }
+
+  const defaultLabel = 'Default (no venv)';
+  const displayNameCounts = new Map<string, number>();
+  for (const environment of environments) {
+    displayNameCounts.set(
+      environment.displayName,
+      (displayNameCounts.get(environment.displayName) ?? 0) + 1,
+    );
+  }
+  const environmentLabels = environments.map((environment) =>
+    displayNameCounts.get(environment.displayName) === 1
+      ? environment.displayName
+      : `${environment.displayName} (${environment.name})`,
+  );
+  const labels = [defaultLabel, ...environmentLabels];
+  const result = await InputDialog.getItem({
+    title: 'Select Python Environment',
+    label: 'Kernel:',
+    items: labels,
+    current: currentEnvironmentIndex + 1,
+  });
+  if (!result.button.accept || result.value === null) {
+    return { accepted: false, displayName: '', venv: undefined };
+  }
+
+  const selectedIndex = labels.indexOf(result.value) - 1;
+  const environment = environments[selectedIndex];
+  return {
+    accepted: true,
+    displayName: environment?.displayName ?? 'Default',
+    venv: environment?.pythonPath,
+  };
+}
+
+interface NotebookEnvironment {
+  isMarimo: boolean;
+  venv: string | undefined;
+}
+
+async function getNotebookEnvironment(
+  filePath: string,
+): Promise<NotebookEnvironment> {
+  const settings = ServerConnection.makeSettings();
+  const query = new URLSearchParams({ path: filePath });
+  const response = await ServerConnection.makeRequest(
+    `${settings.baseUrl}marimo-tools/set-venv?${query.toString()}`,
+    { method: 'GET' },
+    settings,
+  );
+  const result = (await response.json()) as {
+    success: boolean;
+    isMarimo?: boolean;
+    venv?: string | null;
+    error?: string;
+  };
+  if (!response.ok || !result.success) {
+    throw new Error(result.error ?? 'Failed to inspect notebook');
+  }
+  return {
+    isMarimo: result.isMarimo === true,
+    venv: result.venv ?? undefined,
+  };
+}
+
+async function isSandboxDisabled(): Promise<boolean> {
+  const settings = ServerConnection.makeSettings();
+  try {
+    const response = await ServerConnection.makeRequest(
+      `${settings.baseUrl}marimo-tools/config`,
+      { method: 'GET' },
+      settings,
+    );
+    if (response.ok) {
+      const config = (await response.json()) as { no_sandbox: boolean };
+      return config.no_sandbox;
+    }
+  } catch {
+    // Sandbox mode is the default when configuration cannot be read.
+  }
+  return false;
 }
 
 /**
@@ -477,31 +642,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
       caption: 'Create a new marimo notebook',
       execute: async () => {
         try {
-          // Check if sandbox is disabled (venv selection requires --sandbox)
-          const settings = ServerConnection.makeSettings();
-          let noSandbox = false;
-          try {
-            const configResponse = await ServerConnection.makeRequest(
-              `${settings.baseUrl}marimo-tools/config`,
-              { method: 'GET' },
-              settings,
-            );
-            if (configResponse.ok) {
-              const configData = (await configResponse.json()) as {
-                no_sandbox: boolean;
-              };
-              noSandbox = configData.no_sandbox;
-            }
-          } catch {
-            // If config fetch fails, assume sandbox enabled (default)
-          }
-
           const browser = fileBrowserFactory.tracker.currentWidget;
           const cwd = browser?.model.path || '';
 
-          // If sandbox is disabled, skip venv picker
           // If navigated into a subdirectory, prompt for name so file lands there
-          if (noSandbox) {
+          if (await isSandboxDisabled()) {
             if (cwd) {
               await createNotebookAt(cwd, undefined);
             } else {
@@ -510,77 +655,18 @@ const plugin: JupyterFrontEndPlugin<void> = {
             return;
           }
 
-          // Fetch available kernel specs
-          const specs = await KernelSpecAPI.getSpecs();
-
-          // Extract kernel names and display names, filtering out non-venv entries
-          const kernelEntries: {
-            name: string;
-            displayName: string;
-            argv: string[];
-          }[] = [];
-          if (specs?.kernelspecs) {
-            for (const [name, spec] of Object.entries(specs.kernelspecs)) {
-              if (!spec) {
-                continue;
-              }
-              const argv = spec.argv ?? [];
-              if (argv.length > 0) {
-                const pythonPath = argv[0];
-                // Skip entries that are just "python" or "python3" (not a venv path)
-                // A venv path contains a directory separator
-                if (!pythonPath.includes('/') && !pythonPath.includes('\\')) {
-                  continue;
-                }
-                kernelEntries.push({
-                  name,
-                  displayName: spec.display_name ?? name,
-                  argv,
-                });
-              }
-            }
-          }
-
-          // If no venv kernels, skip dropdown
-          if (kernelEntries.length === 0) {
-            if (cwd) {
-              await createNotebookAt(cwd, undefined);
-            } else {
-              await openScratchNotebook();
-            }
+          const selection = await selectPythonEnvironment();
+          if (!selection.accepted) {
             return;
           }
-
-          // Show dropdown dialog to select kernel, with "Default" as first option
-          const items = [
-            'Default (no venv)',
-            ...kernelEntries.map((k) => k.displayName),
-          ];
-          const kernelResult = await InputDialog.getItem({
-            title: 'Select Python Environment',
-            label: 'Kernel:',
-            items,
-            current: 0,
-          });
-
-          // If user cancelled or no selection, return early
-          if (!kernelResult.button.accept || kernelResult.value === null) {
-            return;
-          }
-
-          // Get venv path from selected kernel (undefined if Default)
-          const selectedKernel = kernelEntries.find(
-            (k) => k.displayName === kernelResult.value,
-          );
-          const venv = selectedKernel?.argv[0];
 
           // If Default selected and at root, open marimo directly
-          if (!venv && !cwd) {
+          if (!selection.venv && !cwd) {
             await openScratchNotebook();
             return;
           }
 
-          await createNotebookAt(cwd, venv);
+          await createNotebookAt(cwd, selection.venv);
         } catch {
           // Fall back to opening marimo directly on any error
           await openScratchNotebook();
@@ -602,82 +688,135 @@ const plugin: JupyterFrontEndPlugin<void> = {
             : browser?.model.path || '';
 
         try {
-          const settings = ServerConnection.makeSettings();
-          let noSandbox = false;
-          try {
-            const configResponse = await ServerConnection.makeRequest(
-              `${settings.baseUrl}marimo-tools/config`,
-              { method: 'GET' },
-              settings,
-            );
-            if (configResponse.ok) {
-              const configData = (await configResponse.json()) as {
-                no_sandbox: boolean;
-              };
-              noSandbox = configData.no_sandbox;
-            }
-          } catch {
-            // assume sandbox enabled
-          }
-
           let venv: string | undefined;
-
-          if (!noSandbox) {
-            const specs = await KernelSpecAPI.getSpecs();
-            const kernelEntries: {
-              name: string;
-              displayName: string;
-              argv: string[];
-            }[] = [];
-            if (specs?.kernelspecs) {
-              for (const [name, spec] of Object.entries(specs.kernelspecs)) {
-                if (!spec) {
-                  continue;
-                }
-                const argv = spec.argv ?? [];
-                if (argv.length > 0) {
-                  const pythonPath = argv[0];
-                  if (
-                    !pythonPath.includes('/') &&
-                    !pythonPath.includes('\\')
-                  ) {
-                    continue;
-                  }
-                  kernelEntries.push({
-                    name,
-                    displayName: spec.display_name ?? name,
-                    argv,
-                  });
-                }
-              }
+          if (!(await isSandboxDisabled())) {
+            const selection = await selectPythonEnvironment();
+            if (!selection.accepted) {
+              return;
             }
-
-            if (kernelEntries.length > 0) {
-              const items = [
-                'Default (no venv)',
-                ...kernelEntries.map((k) => k.displayName),
-              ];
-              const kernelResult = await InputDialog.getItem({
-                title: 'Select Python Environment',
-                label: 'Kernel:',
-                items,
-                current: 0,
-              });
-              if (!kernelResult.button.accept || kernelResult.value === null) {
-                return;
-              }
-              if (kernelResult.value !== 'Default (no venv)') {
-                const selectedKernel = kernelEntries.find(
-                  (k) => k.displayName === kernelResult.value,
-                );
-                venv = selectedKernel?.argv[0];
-              }
-            }
+            venv = selection.venv;
           }
 
           await createNotebookAt(cwd, venv);
         } catch {
           showErrorMessage('Error', 'Failed to create notebook in folder');
+        }
+      },
+    });
+
+    commands.addCommand(CommandIDs.changeEnvironment, {
+      label: 'Change Python Environment',
+      caption: 'Change the Python environment used by this marimo notebook',
+      icon: marimoIcon,
+      isVisible: () => {
+        const path = getSelectedFilePath(fileBrowserFactory);
+        return path !== null && isPythonFile(path);
+      },
+      execute: async () => {
+        const filePath = getSelectedFilePath(fileBrowserFactory);
+        if (!filePath) {
+          return;
+        }
+        const widget = getWidgetByFilePath(filePath);
+        let widgetDisconnected = false;
+
+        try {
+          if (await isSandboxDisabled()) {
+            await showErrorMessage(
+              'Python environments unavailable',
+              'This marimo server is running without sandbox support.',
+            );
+            return;
+          }
+
+          const notebookEnvironment = await getNotebookEnvironment(filePath);
+          if (!notebookEnvironment.isMarimo) {
+            await showErrorMessage(
+              'Not a marimo notebook',
+              `“${filePath}” does not define a marimo app.`,
+            );
+            return;
+          }
+          const selection = await selectPythonEnvironment({
+            currentVenv: notebookEnvironment.venv,
+            showDefaultOnly: true,
+          });
+          if (!selection.accepted) {
+            return;
+          }
+
+          const sessions = (await isMarimoProcessAlive())
+            ? await fetchRunningSessions(marimoBaseUrl)
+            : [];
+          const session = sessions.find(
+            (candidate) => candidate.path === filePath,
+          );
+          if (session) {
+            const confirmation = await showDialog({
+              title: 'Restart marimo notebook?',
+              body: `Changing the Python environment will restart “${filePath}”. Make sure your latest edits are saved.`,
+              buttons: [
+                Dialog.cancelButton(),
+                Dialog.okButton({ label: 'Restart' }),
+              ],
+            });
+            if (!confirmation.button.accept) {
+              return;
+            }
+
+            if (widget) {
+              disconnectWidgetByFilePath(filePath);
+              widgetDisconnected = true;
+            }
+            const shutdownResponse = await fetch(
+              `${marimoBaseUrl}api/home/shutdown_session`,
+              {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: session.sessionId }),
+              },
+            );
+            if (!shutdownResponse.ok) {
+              throw new Error(
+                `Failed to stop the current session (${shutdownResponse.status})`,
+              );
+            }
+          }
+
+          const settings = ServerConnection.makeSettings();
+          const response = await ServerConnection.makeRequest(
+            `${settings.baseUrl}marimo-tools/set-venv`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ path: filePath, venv: selection.venv }),
+            },
+            settings,
+          );
+          const result = (await response.json()) as {
+            success: boolean;
+            error?: string;
+          };
+          if (!response.ok || !result.success) {
+            throw new Error(result.error ?? 'Failed to update environment');
+          }
+
+          if (widget) {
+            refreshWidgetByFilePath(filePath);
+            widgetDisconnected = false;
+            shell.activateById(widget.id);
+          }
+          Notification.success(
+            `Python environment changed to ${selection.displayName}`,
+          );
+        } catch (error) {
+          if (widgetDisconnected) {
+            refreshWidgetByFilePath(filePath);
+          }
+          await showErrorMessage(
+            'Failed to change Python environment',
+            `${error}`,
+          );
         }
       },
     });
@@ -744,6 +883,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
       command: CommandIDs.openFile,
       selector: '.jp-DirListing-item[data-isdir="false"]',
       rank: 50,
+    });
+
+    app.contextMenu.addItem({
+      command: CommandIDs.changeEnvironment,
+      selector: '.jp-DirListing-item[data-isdir="false"]',
+      rank: 50.5,
     });
 
     app.contextMenu.addItem({
