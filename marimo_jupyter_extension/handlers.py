@@ -510,6 +510,16 @@ def _get_notebook_venv(content: str) -> str | None:
     return None
 
 
+def _has_marimo_app_markers(content: str) -> bool:
+    """Match marimo's directory-scanner check for Python notebooks."""
+    # marimo is not a dependency of this extension when it runs through uvx,
+    # so its internal directory-scanner helper cannot be imported here.
+    return (
+        re.search(r"^import marimo(?:\s|$)", content, re.MULTILINE) is not None
+        and "marimo.App" in content
+    )
+
+
 class SetVenvHandler(JupyterHandler):
     """Handler for changing a saved marimo notebook's environment."""
 
@@ -556,7 +566,14 @@ class SetVenvHandler(JupyterHandler):
 
         try:
             content = await self._read_notebook(path)
-            self.finish({"success": True, "venv": _get_notebook_venv(content)})
+            is_marimo = _has_marimo_app_markers(content)
+            self.finish(
+                {
+                    "success": True,
+                    "isMarimo": is_marimo,
+                    "venv": _get_notebook_venv(content) if is_marimo else None,
+                }
+            )
         except web.HTTPError as e:
             self._finish_contents_error(e)
         except ValueError as e:
@@ -611,6 +628,15 @@ class SetVenvHandler(JupyterHandler):
 
         try:
             content = await self._read_notebook(path)
+            if not _has_marimo_app_markers(content):
+                self.set_status(400)
+                self.finish(
+                    {
+                        "success": False,
+                        "error": "File is not a marimo notebook",
+                    }
+                )
+                return
             updated = _set_notebook_venv(content, venv)
             await self._save_notebook(path, updated)
             self.finish(

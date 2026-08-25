@@ -237,25 +237,34 @@ async function selectPythonEnvironment(
   };
 }
 
-async function getConfiguredEnvironment(
+interface NotebookEnvironment {
+  isMarimo: boolean;
+  venv: string | undefined;
+}
+
+async function getNotebookEnvironment(
   filePath: string,
-): Promise<string | undefined> {
+): Promise<NotebookEnvironment> {
   const settings = ServerConnection.makeSettings();
   const query = new URLSearchParams({ path: filePath });
-  try {
-    const response = await ServerConnection.makeRequest(
-      `${settings.baseUrl}marimo-tools/set-venv?${query.toString()}`,
-      { method: 'GET' },
-      settings,
-    );
-    if (response.ok) {
-      const result = (await response.json()) as { venv?: string | null };
-      return result.venv ?? undefined;
-    }
-  } catch {
-    // The picker can still work when the current value cannot be read.
+  const response = await ServerConnection.makeRequest(
+    `${settings.baseUrl}marimo-tools/set-venv?${query.toString()}`,
+    { method: 'GET' },
+    settings,
+  );
+  const result = (await response.json()) as {
+    success: boolean;
+    isMarimo?: boolean;
+    venv?: string | null;
+    error?: string;
+  };
+  if (!response.ok || !result.success) {
+    throw new Error(result.error ?? 'Failed to inspect notebook');
   }
-  return undefined;
+  return {
+    isMarimo: result.isMarimo === true,
+    venv: result.venv ?? undefined,
+  };
 }
 
 async function isSandboxDisabled(): Promise<boolean> {
@@ -712,9 +721,16 @@ const plugin: JupyterFrontEndPlugin<void> = {
             return;
           }
 
-          const currentVenv = await getConfiguredEnvironment(filePath);
+          const notebookEnvironment = await getNotebookEnvironment(filePath);
+          if (!notebookEnvironment.isMarimo) {
+            await showErrorMessage(
+              'Not a marimo notebook',
+              `“${filePath}” does not define a marimo app.`,
+            );
+            return;
+          }
           const selection = await selectPythonEnvironment({
-            currentVenv,
+            currentVenv: notebookEnvironment.venv,
             showDefaultOnly: true,
           });
           if (!selection.accepted) {

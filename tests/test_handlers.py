@@ -546,8 +546,46 @@ class TestSetNotebookVenv:
         assert _get_notebook_venv(content) == "/srv/envs/project"
 
 
+class TestHasMarimoAppMarkers:
+    def test_uses_marimo_app_markers(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert _has_marimo_app_markers(
+            "import marimo\napp = marimo.App(width='medium')\n"
+        )
+
+    def test_requires_marimo_import_marker(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers("app = marimo.App()\n")
+
+    def test_import_marker_must_not_be_indented(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers(
+            "if True:\n    import marimo\n    marimo.App()\n"
+        )
+
+    def test_import_marker_requires_exact_module_name(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers(
+            "import marimo_tools\nmarimo.App()\n"
+        )
+
+    def test_requires_marimo_app_marker(self):
+        from marimo_jupyter_extension.handlers import _has_marimo_app_markers
+
+        assert not _has_marimo_app_markers("import marimo\nprint('hello')\n")
+
+
 class TestSetVenvHandler:
-    def _build(self, body, *, content="import marimo\n"):
+    def _build(
+        self,
+        body,
+        *,
+        content="import marimo\napp = marimo.App()\n",
+    ):
         from marimo_jupyter_extension.handlers import SetVenvHandler
 
         contents_manager = MagicMock()
@@ -660,6 +698,32 @@ class TestSetVenvHandler:
             }
         )
 
+    def test_rejects_python_file_that_is_not_a_marimo_notebook(self):
+        handler, contents_manager = self._build(
+            {"path": "script.py", "venv": "/srv/env/bin/python"},
+            content="print('ordinary Python')\n",
+        )
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "File is not a marimo notebook"}
+        )
+        contents_manager.save.assert_not_called()
+
+    def test_get_identifies_non_marimo_python_file(self):
+        handler, _contents_manager = self._build(
+            {}, content="print('ordinary Python')\n"
+        )
+        handler.get_argument = MagicMock(return_value="script.py")
+
+        _run(handler, "get")
+
+        handler.finish.assert_called_once_with(
+            {"success": True, "isMarimo": False, "venv": None}
+        )
+
     def test_get_returns_current_environment(self):
         handler, contents_manager = self._build(
             {},
@@ -668,6 +732,8 @@ class TestSetVenvHandler:
                 "# [tool.marimo.venv]\n"
                 '# path = "/srv/envs/project"\n'
                 "# ///\n"
+                "import marimo\n"
+                "app = marimo.App()\n"
             ),
         )
         handler.get_argument = MagicMock(return_value="notebook.py")
@@ -675,7 +741,11 @@ class TestSetVenvHandler:
         _run(handler, "get")
 
         handler.finish.assert_called_once_with(
-            {"success": True, "venv": "/srv/envs/project"}
+            {
+                "success": True,
+                "isMarimo": True,
+                "venv": "/srv/envs/project",
+            }
         )
         contents_manager.get.assert_called_once_with(
             path="notebook.py", type="file", format="text", content=True
