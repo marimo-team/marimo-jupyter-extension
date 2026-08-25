@@ -21,7 +21,7 @@
 - 🚀 **Launcher Integration** - marimo appears in the JupyterLab launcher with its own icon
 - 🍃 **First-Class Marimo Notebook Support** - Double-click `_mo.py` files to open directly in marimo
 - 📊 **Sidebar Panel** - Monitor server status, view running sessions, and quick actions
-- 🐍 **Venv Selection** - Choose Python environment when creating new notebooks (with PEP 723 metadata)
+- 🐍 **Venv Selection** - Choose or change a notebook's Python environment (with PEP 723 metadata)
 - 📁 **Context Menus** - Right-click `.py` files to edit with marimo, `.ipynb` files to convert
 - 🏢 **JupyterHub Compatible** - Works with existing authenticators and spawners
 - 🔒 **Secure** - Token-based authentication between proxy and marimo
@@ -50,7 +50,7 @@ clickable running sessions with separate shutdown buttons, and quick actions.
 
 ### Environment Selection
 
-When creating a new notebook, select from available Python environments. The extension discovers Jupyter kernel specs and embeds the venv path using PEP 723 script metadata.
+When creating a new notebook, select from available Python environments. The extension discovers Jupyter kernel specs and embeds the venv path using PEP 723 script metadata. To switch an existing notebook, right-click its `.py` file and choose **Change Python Environment**. If the notebook is running, the extension asks before restarting its session.
 
 ### File Type Handling
 

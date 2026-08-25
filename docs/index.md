@@ -21,7 +21,7 @@ Launch JupyterLab and click the marimo icon in the launcher.
 - **JupyterLab Integration**: marimo appears in the launcher with its own icon
 - **First-Class Marimo Notebook Support**: `_mo.py` files are recognized as Marimo notebooks and open in marimo by default on double-click
 - **Sidebar Panel**: Server status, running sessions, and quick actions
-- **Venv Selection**: Choose Python environment when creating new notebooks
+- **Venv Selection**: Choose or change a notebook's Python environment
 - **Context Menus**: Right-click to edit .py files or convert .ipynb files
 - **JupyterHub Support**: Works with existing authenticators and spawners
 - **Secure**: Token-based authentication between proxy and marimo

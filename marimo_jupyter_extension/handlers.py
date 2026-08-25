@@ -2,7 +2,8 @@
 
 import asyncio
 import json
-from pathlib import Path
+import re
+from pathlib import Path, PurePath, PureWindowsPath
 
 from jupyter_server.base.handlers import JupyterHandler
 from jupyter_server.utils import url_path_join
@@ -263,11 +264,7 @@ class CreateStubHandler(JupyterHandler):
 
         # Add PEP 723 header if venv is specified
         if venv:
-            # Extract venv directory from python executable path
-            # e.g., /path/to/venv/bin/python3.12 -> /path/to/venv
-            venv_path = Path(venv)
-            if venv_path.parent.name == "bin":
-                venv_path = venv_path.parent.parent
+            venv_path = _venv_directory(venv)
             lines.extend(
                 [
                     "# /// script",
@@ -316,6 +313,279 @@ class CreateStubHandler(JupyterHandler):
             file_path = Path(path)
             file_path.write_text(content)
             self.finish({"success": True, "path": path})
+        except Exception as e:
+            self.set_status(500)
+            self.finish({"success": False, "error": str(e)})
+
+
+def _venv_directory(python_executable: str) -> PurePath:
+    """Return the environment directory for a kernelspec interpreter."""
+    executable: PurePath
+    if "\\" in python_executable and "/" not in python_executable:
+        executable = PureWindowsPath(python_executable)
+    else:
+        executable = Path(python_executable)
+    if executable.parent.name.casefold() in {"bin", "scripts"}:
+        return executable.parent.parent
+    return executable
+
+
+def _line_without_ending(line: str) -> str:
+    return line.rstrip("\r\n")
+
+
+def _pep723_content(line: str) -> str | None:
+    """Return the TOML content from one PEP 723 comment line."""
+    line = _line_without_ending(line)
+    if line == "#":
+        return ""
+    if line.startswith("# "):
+        return line[2:]
+    return None
+
+
+def _set_notebook_venv(content: str, venv: str | None) -> str:
+    """Set or clear ``tool.marimo.venv.path`` in notebook metadata.
+
+    This intentionally edits the existing text instead of parsing and
+    serializing all TOML, so dependency pins, comments, and formatting remain
+    untouched.
+    """
+    lines = content.splitlines(keepends=True)
+    starts = [
+        index
+        for index, line in enumerate(lines)
+        if _line_without_ending(line) == "# /// script"
+    ]
+    if len(starts) > 1:
+        raise ValueError("Multiple PEP 723 script metadata blocks found")
+
+    newline = "\r\n" if "\r\n" in content else "\n"
+    path_line = None
+    if venv:
+        quoted_path = json.dumps(
+            str(_venv_directory(venv)), ensure_ascii=False
+        )
+        path_line = f"# path = {quoted_path}{newline}"
+
+    if not starts:
+        if path_line is None:
+            return content
+        insert_at = 0
+        if lines and _line_without_ending(lines[0]).startswith("#!"):
+            insert_at = 1
+        encoding_pattern = re.compile(r"^\s*#.*?coding[:=]\s*[-_.a-zA-Z0-9]+")
+        if insert_at < len(lines) and encoding_pattern.match(
+            _line_without_ending(lines[insert_at])
+        ):
+            insert_at += 1
+        if insert_at and not lines[insert_at - 1].endswith(("\n", "\r")):
+            lines[insert_at - 1] += newline
+        lines[insert_at:insert_at] = [
+            f"# /// script{newline}",
+            f"# [tool.marimo.venv]{newline}",
+            path_line,
+            f"# ///{newline}",
+            newline,
+        ]
+        return "".join(lines)
+
+    start = starts[0]
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(lines))
+            if _line_without_ending(lines[index]) == "# ///"
+        ),
+        None,
+    )
+    if end is None:
+        raise ValueError("Unterminated PEP 723 script metadata block")
+
+    section_pattern = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
+    path_pattern = re.compile(r"^\s*path\s*=")
+    section_start = None
+    section_end = end
+    for index in range(start + 1, end):
+        metadata_line = _pep723_content(lines[index])
+        if metadata_line is None:
+            continue
+        match = section_pattern.match(metadata_line)
+        if not match:
+            continue
+        if section_start is not None:
+            section_end = index
+            break
+        if match.group(1).strip() == "tool.marimo.venv":
+            section_start = index
+
+    if section_start is None:
+        if path_line is None:
+            return content
+        lines[end:end] = [
+            f"# [tool.marimo.venv]{newline}",
+            path_line,
+        ]
+        return "".join(lines)
+
+    path_indexes = []
+    for index in range(section_start + 1, section_end):
+        metadata_line = _pep723_content(lines[index])
+        if metadata_line is not None and path_pattern.match(metadata_line):
+            path_indexes.append(index)
+
+    if path_line is not None:
+        if path_indexes:
+            lines[path_indexes[0]] = path_line
+            for index in reversed(path_indexes[1:]):
+                del lines[index]
+        else:
+            lines.insert(section_start + 1, path_line)
+        return "".join(lines)
+
+    for index in reversed(path_indexes):
+        del lines[index]
+        section_end -= 1
+
+    remaining = [
+        _pep723_content(line)
+        for line in lines[section_start + 1 : section_end]
+    ]
+    if not any(line is not None and line.strip() for line in remaining):
+        del lines[section_start:section_end]
+    return "".join(lines)
+
+
+def _get_notebook_venv(content: str) -> str | None:
+    """Read ``tool.marimo.venv.path`` without importing marimo or TOML."""
+    lines = content.splitlines(keepends=True)
+    starts = [
+        index
+        for index, line in enumerate(lines)
+        if _line_without_ending(line) == "# /// script"
+    ]
+    if len(starts) > 1:
+        raise ValueError("Multiple PEP 723 script metadata blocks found")
+    if not starts:
+        return None
+
+    start = starts[0]
+    end = next(
+        (
+            index
+            for index in range(start + 1, len(lines))
+            if _line_without_ending(lines[index]) == "# ///"
+        ),
+        None,
+    )
+    if end is None:
+        raise ValueError("Unterminated PEP 723 script metadata block")
+
+    in_venv_section = False
+    section_pattern = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
+    path_pattern = re.compile(r"^\s*path\s*=\s*(.+?)\s*$")
+    for line in lines[start + 1 : end]:
+        metadata_line = _pep723_content(line)
+        if metadata_line is None:
+            continue
+        section = section_pattern.match(metadata_line)
+        if section:
+            in_venv_section = section.group(1).strip() == "tool.marimo.venv"
+            continue
+        if not in_venv_section:
+            continue
+        path = path_pattern.match(metadata_line)
+        if not path:
+            continue
+        value = path.group(1)
+        try:
+            parsed, _end = json.JSONDecoder().raw_decode(value)
+            return parsed if isinstance(parsed, str) else None
+        except json.JSONDecodeError:
+            if len(value) >= 2 and value[0] == value[-1] == "'":
+                return value[1:-1]
+            return None
+    return None
+
+
+class SetVenvHandler(JupyterHandler):
+    """Handler for changing a saved marimo notebook's environment."""
+
+    @web.authenticated
+    async def get(self):
+        """Return the currently configured environment for a notebook."""
+        path = self.get_argument("path", None)
+        if not path:
+            self.set_status(400)
+            self.finish({"success": False, "error": "Missing path"})
+            return
+
+        try:
+            with Path(path).open(encoding="utf-8", newline="") as file:
+                content = file.read()
+            self.finish({"success": True, "venv": _get_notebook_venv(content)})
+        except FileNotFoundError:
+            self.set_status(404)
+            self.finish({"success": False, "error": "Notebook not found"})
+        except ValueError as e:
+            self.set_status(400)
+            self.finish({"success": False, "error": str(e)})
+        except Exception as e:
+            self.set_status(500)
+            self.finish({"success": False, "error": str(e)})
+
+    @web.authenticated
+    async def post(self):
+        """Update the notebook's ``tool.marimo.venv.path`` metadata.
+
+        POST /marimo-tools/set-venv
+        Body: {"path": "notebook.py", "venv": "/path/to/python" | null}
+        """
+        data = json.loads(self.request.body)
+        path = data.get("path")
+        venv = data.get("venv")
+
+        if not isinstance(path, str) or not path:
+            self.set_status(400)
+            self.finish({"success": False, "error": "Missing path"})
+            return
+        if not path.endswith(".py"):
+            self.set_status(400)
+            self.finish(
+                {
+                    "success": False,
+                    "error": (
+                        "Environment selection is only supported for "
+                        "Python notebooks"
+                    ),
+                }
+            )
+            return
+        if venv is not None and not isinstance(venv, str):
+            self.set_status(400)
+            self.finish({"success": False, "error": "Invalid venv"})
+            return
+
+        file_path = Path(path)
+        try:
+            with file_path.open(encoding="utf-8", newline="") as file:
+                content = file.read()
+            updated = _set_notebook_venv(content, venv)
+            with file_path.open("w", encoding="utf-8", newline="") as file:
+                file.write(updated)
+            self.finish(
+                {
+                    "success": True,
+                    "path": path,
+                    "venv": str(_venv_directory(venv)) if venv else None,
+                }
+            )
+        except FileNotFoundError:
+            self.set_status(404)
+            self.finish({"success": False, "error": "Notebook not found"})
+        except ValueError as e:
+            self.set_status(400)
+            self.finish({"success": False, "error": str(e)})
         except Exception as e:
             self.set_status(500)
             self.finish({"success": False, "error": str(e)})
@@ -445,6 +715,10 @@ def _load_jupyter_server_extension(server_app):
             (
                 url_path_join(base_url, "marimo-tools/create-stub"),
                 CreateStubHandler,
+            ),
+            (
+                url_path_join(base_url, "marimo-tools/set-venv"),
+                SetVenvHandler,
             ),
             (url_path_join(base_url, "marimo-tools/config"), ConfigHandler),
         ],
