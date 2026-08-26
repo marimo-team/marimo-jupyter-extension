@@ -127,7 +127,6 @@ function getSelectedFilePath(
 interface PythonEnvironment {
   name: string;
   displayName: string;
-  pythonPath: string;
 }
 
 interface EnvironmentSelection {
@@ -144,33 +143,53 @@ async function getPythonEnvironments(): Promise<PythonEnvironment[]> {
   }
 
   for (const [name, spec] of Object.entries(specs.kernelspecs)) {
-    if (spec?.language && spec.language.toLowerCase() !== 'python') {
+    if (spec?.language?.toLowerCase() !== 'python') {
       continue;
     }
-    const pythonPath = spec?.argv?.[0];
-    if (
-      !pythonPath ||
-      (!pythonPath.includes('/') && !pythonPath.includes('\\'))
-    ) {
+    if (!spec?.argv?.[0]) {
       continue;
     }
     environments.push({
       name,
       displayName: spec.display_name ?? name,
-      pythonPath,
     });
   }
   return environments;
 }
 
+async function resolveKernelEnvironment(kernel: string): Promise<string> {
+  const settings = ServerConnection.makeSettings();
+  const response = await ServerConnection.makeRequest(
+    `${settings.baseUrl}marimo-tools/resolve-kernel`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ kernel }),
+    },
+    settings,
+  );
+  const result = (await response.json()) as {
+    success: boolean;
+    venv?: string;
+    error?: string;
+  };
+  if (!response.ok || !result.success || !result.venv) {
+    throw new Error(result.error ?? 'Failed to inspect Python environment');
+  }
+  return result.venv;
+}
+
 async function selectPythonEnvironment(
   options: {
     currentVenv?: string;
-    showDefaultOnly?: boolean;
+    promptWhenDefaultOnly?: boolean;
   } = {},
 ): Promise<EnvironmentSelection> {
   const environments = await getPythonEnvironments();
-  if (environments.length === 0 && !options.showDefaultOnly) {
+  if (
+    environments.length === 0 &&
+    !options.currentVenv &&
+    !options.promptWhenDefaultOnly
+  ) {
     return {
       accepted: true,
       displayName: 'Default',
@@ -178,34 +197,13 @@ async function selectPythonEnvironment(
     };
   }
 
-  const normalizeEnvironmentPath = (path: string): string => {
-    const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
-    const withoutInterpreter = normalized.replace(
-      /\/(?:bin|scripts)\/[^/]+$/i,
-      '',
-    );
-    return /^[a-z]:/i.test(withoutInterpreter)
-      ? withoutInterpreter.toLowerCase()
-      : withoutInterpreter;
-  };
-  let currentEnvironmentIndex = -1;
-  if (options.currentVenv) {
-    const currentPath = normalizeEnvironmentPath(options.currentVenv);
-    currentEnvironmentIndex = environments.findIndex(
-      (environment) =>
-        normalizeEnvironmentPath(environment.pythonPath) === currentPath,
-    );
-    if (currentEnvironmentIndex === -1) {
-      environments.push({
-        name: 'current',
-        displayName: `Current (${options.currentVenv})`,
-        pythonPath: options.currentVenv,
-      });
-      currentEnvironmentIndex = environments.length - 1;
-    }
-  }
-
   const defaultLabel = 'Default (no venv)';
+  const currentLabel = options.currentVenv
+    ? `Current (${options.currentVenv})`
+    : undefined;
+  const reservedLabels = new Set(
+    [defaultLabel, currentLabel].filter((label) => label !== undefined),
+  );
   const displayNameCounts = new Map<string, number>();
   for (const environment of environments) {
     displayNameCounts.set(
@@ -213,28 +211,54 @@ async function selectPythonEnvironment(
       (displayNameCounts.get(environment.displayName) ?? 0) + 1,
     );
   }
-  const environmentLabels = environments.map((environment) =>
-    displayNameCounts.get(environment.displayName) === 1
-      ? environment.displayName
-      : `${environment.displayName} (${environment.name})`,
-  );
-  const labels = [defaultLabel, ...environmentLabels];
+  const environmentLabels = environments.map((environment) => {
+    const label =
+      displayNameCounts.get(environment.displayName) === 1
+        ? environment.displayName
+        : `${environment.displayName} (${environment.name})`;
+    return reservedLabels.has(label)
+      ? `${label} (${environment.name})`
+      : label;
+  });
+  const labels = [
+    defaultLabel,
+    ...(currentLabel ? [currentLabel] : []),
+    ...environmentLabels,
+  ];
   const result = await InputDialog.getItem({
     title: 'Select Python Environment',
     label: 'Kernel:',
     items: labels,
-    current: currentEnvironmentIndex + 1,
+    current: currentLabel ? 1 : 0,
   });
   if (!result.button.accept || result.value === null) {
     return { accepted: false, displayName: '', venv: undefined };
   }
 
-  const selectedIndex = labels.indexOf(result.value) - 1;
+  if (result.value === defaultLabel) {
+    return {
+      accepted: true,
+      displayName: 'Default',
+      venv: undefined,
+    };
+  }
+  if (currentLabel && result.value === currentLabel) {
+    return {
+      accepted: true,
+      displayName: 'Current',
+      venv: options.currentVenv,
+    };
+  }
+
+  const selectedIndex = environmentLabels.indexOf(result.value);
   const environment = environments[selectedIndex];
+  if (!environment) {
+    throw new Error('Selected Python environment is no longer available');
+  }
   return {
     accepted: true,
-    displayName: environment?.displayName ?? 'Default',
-    venv: environment?.pythonPath,
+    displayName: environment.displayName,
+    venv: await resolveKernelEnvironment(environment.name),
   };
 }
 
@@ -739,9 +763,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
           }
           const selection = await selectPythonEnvironment({
             currentVenv: notebookEnvironment.venv,
-            showDefaultOnly: true,
+            promptWhenDefaultOnly: true,
           });
           if (!selection.accepted) {
+            return;
+          }
+          if (selection.venv === notebookEnvironment.venv) {
             return;
           }
 
@@ -763,7 +790,26 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (!confirmation.button.accept) {
               return;
             }
+          }
 
+          const settings = ServerConnection.makeSettings();
+          const response = await ServerConnection.makeRequest(
+            `${settings.baseUrl}marimo-tools/set-venv`,
+            {
+              method: 'POST',
+              body: JSON.stringify({ path: filePath, venv: selection.venv }),
+            },
+            settings,
+          );
+          const result = (await response.json()) as {
+            success: boolean;
+            error?: string;
+          };
+          if (!response.ok || !result.success) {
+            throw new Error(result.error ?? 'Failed to update environment');
+          }
+
+          if (session) {
             if (widget) {
               disconnectWidgetByFilePath(filePath);
               widgetDisconnected = true;
@@ -782,23 +828,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
                 `Failed to stop the current session (${shutdownResponse.status})`,
               );
             }
-          }
-
-          const settings = ServerConnection.makeSettings();
-          const response = await ServerConnection.makeRequest(
-            `${settings.baseUrl}marimo-tools/set-venv`,
-            {
-              method: 'POST',
-              body: JSON.stringify({ path: filePath, venv: selection.venv }),
-            },
-            settings,
-          );
-          const result = (await response.json()) as {
-            success: boolean;
-            error?: string;
-          };
-          if (!response.ok || !result.success) {
-            throw new Error(result.error ?? 'Failed to update environment');
           }
 
           if (widget) {

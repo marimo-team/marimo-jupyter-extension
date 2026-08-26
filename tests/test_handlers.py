@@ -3,10 +3,11 @@
 import asyncio
 import json
 import re
+import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -382,9 +383,7 @@ class TestSetNotebookVenv:
         from marimo_jupyter_extension.handlers import _set_notebook_venv
 
         content = "import marimo\napp = marimo.App()\n"
-        updated = _set_notebook_venv(
-            content, "/srv/envs/project/bin/python3.12"
-        )
+        updated = _set_notebook_venv(content, "/srv/envs/project")
 
         assert updated.startswith(
             "# /// script\n"
@@ -401,7 +400,7 @@ class TestSetNotebookVenv:
             "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\nimport marimo\n"
         )
 
-        updated = _set_notebook_venv(content, "/env/bin/python")
+        updated = _set_notebook_venv(content, "/env")
 
         assert updated.startswith(
             "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n# /// script\n"
@@ -418,7 +417,7 @@ class TestSetNotebookVenv:
             "import marimo\r\n"
         )
 
-        updated = _set_notebook_venv(content, "/new/bin/python")
+        updated = _set_notebook_venv(content, "/new")
 
         assert '# path = "/new"\r\n' in updated
         assert updated.count("\n") == updated.count("\r\n")
@@ -438,7 +437,7 @@ class TestSetNotebookVenv:
             "import marimo\n"
         )
 
-        updated = _set_notebook_venv(content, "/new/environment/bin/python")
+        updated = _set_notebook_venv(content, "/new/environment")
 
         assert '# path = "/new/environment"\n' in updated
         assert '# path = "/old/environment"\n' not in updated
@@ -453,16 +452,12 @@ class TestSetNotebookVenv:
             '# /// script\n# dependencies = ["polars"]\n# ///\nimport marimo\n'
         )
 
-        updated = _set_notebook_venv(content, "/env/bin/python")
+        updated = _set_notebook_venv(content, "/env")
 
-        assert updated == (
-            "# /// script\n"
-            '# dependencies = ["polars"]\n'
-            "# [tool.marimo.venv]\n"
-            '# path = "/env"\n'
-            "# ///\n"
-            "import marimo\n"
-        )
+        assert '# dependencies = ["polars"]\n' in updated
+        assert "# [tool.marimo.venv]\n" in updated
+        assert '# path = "/env"\n' in updated
+        assert updated.endswith("# ///\nimport marimo\n")
 
     def test_clear_path_preserves_other_venv_settings(self):
         from marimo_jupyter_extension.handlers import _set_notebook_venv
@@ -482,7 +477,7 @@ class TestSetNotebookVenv:
         assert "# writable = true\n" in updated
         assert "# path =" not in updated
 
-    def test_clear_path_removes_empty_venv_section(self):
+    def test_clear_path_leaves_other_tables_untouched(self):
         from marimo_jupyter_extension.handlers import _set_notebook_venv
 
         content = (
@@ -498,16 +493,14 @@ class TestSetNotebookVenv:
 
         updated = _set_notebook_venv(content, None)
 
-        assert "# [tool.marimo.venv]\n" not in updated
+        assert "# path =" not in updated
         assert "# [tool.marimo.runtime]\n" in updated
         assert '# dependencies = ["polars"]\n' in updated
 
-    def test_windows_kernelspec_resolves_scripts_directory(self):
+    def test_writes_windows_environment_path(self):
         from marimo_jupyter_extension.handlers import _set_notebook_venv
 
-        updated = _set_notebook_venv(
-            "import marimo\n", r"C:\Users\me\venv\Scripts\python.exe"
-        )
+        updated = _set_notebook_venv("import marimo\n", r"C:\Users\me\venv")
 
         assert '# path = "C:\\\\Users\\\\me\\\\venv"\n' in updated
 
@@ -517,7 +510,7 @@ class TestSetNotebookVenv:
         content = "# /// script\n# ///\n# /// script\n# ///\nimport marimo\n"
 
         with pytest.raises(ValueError, match="Multiple PEP 723"):
-            _set_notebook_venv(content, "/env/bin/python")
+            _set_notebook_venv(content, "/env")
 
     def test_reads_configured_path(self):
         from marimo_jupyter_extension.handlers import _get_notebook_venv
@@ -533,6 +526,81 @@ class TestSetNotebookVenv:
 
         assert _get_notebook_venv(content) == "/srv/envs/project"
 
+    @pytest.mark.parametrize(
+        "venv_config",
+        [
+            'venv.path = "/srv/envs/project"',
+            'venv = { path = "/srv/envs/project" }',
+        ],
+    )
+    def test_reads_equivalent_toml_spellings(self, venv_config):
+        from marimo_jupyter_extension.handlers import _get_notebook_venv
+
+        content = f"# /// script\n# [tool.marimo]\n# {venv_config}\n# ///\n"
+
+        assert _get_notebook_venv(content) == "/srv/envs/project"
+
+    @pytest.mark.parametrize(
+        "venv_config",
+        [
+            'venv.path = "/old"',
+            'venv = { path = "/old", writable = true }',
+        ],
+    )
+    def test_updates_equivalent_toml_spellings(self, venv_config):
+        from marimo_jupyter_extension.handlers import (
+            _get_notebook_venv,
+            _set_notebook_venv,
+        )
+
+        content = f"# /// script\n# [tool.marimo]\n# {venv_config}\n# ///\n"
+
+        updated = _set_notebook_venv(content, "/new")
+
+        assert _get_notebook_venv(updated) == "/new"
+        if "writable" in content:
+            assert "writable = true" in updated
+
+    def test_array_table_path_is_not_treated_as_venv_path(self):
+        from marimo_jupyter_extension.handlers import (
+            _get_notebook_venv,
+            _set_notebook_venv,
+        )
+
+        content = (
+            "# /// script\n"
+            "# [tool.marimo.venv]\n"
+            '# path = "/old"\n'
+            "# [[tool.uv.sources]]\n"
+            '# path = "/vendor/wheel"\n'
+            "# editable = true\n"
+            "# ///\n"
+        )
+
+        updated = _set_notebook_venv(content, "/new")
+
+        assert _get_notebook_venv(updated) == "/new"
+        assert '# path = "/vendor/wheel"\n' in updated
+        assert "# editable = true\n" in updated
+
+    def test_rejects_malformed_toml(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = "# /// script\n# dependencies = [\n# ///\n"
+
+        with pytest.raises(ValueError, match="Invalid PEP 723 TOML"):
+            _set_notebook_venv(content, "/new")
+
+    def test_rejects_non_table_venv_config(self):
+        from marimo_jupyter_extension.handlers import _set_notebook_venv
+
+        content = (
+            '# /// script\n# [tool.marimo]\n# venv = "not-a-table"\n# ///\n'
+        )
+
+        with pytest.raises(ValueError, match="must be a table"):
+            _set_notebook_venv(content, "/new")
+
     def test_reads_json_quoted_path_with_comment(self):
         from marimo_jupyter_extension.handlers import _get_notebook_venv
 
@@ -544,6 +612,80 @@ class TestSetNotebookVenv:
         )
 
         assert _get_notebook_venv(content) == "/srv/envs/project"
+
+
+class TestResolveKernelEnvironment:
+    def test_reads_sys_prefix_from_selected_interpreter(self):
+        from marimo_jupyter_extension.handlers import (
+            _resolve_kernel_environment,
+        )
+
+        manager = MagicMock()
+        manager.get_kernel_spec.return_value = SimpleNamespace(
+            language="python",
+            argv=[sys.executable, "-m", "ipykernel_launcher"],
+            env={},
+        )
+
+        prefix = asyncio.run(_resolve_kernel_environment(manager, "python"))
+
+        assert prefix == sys.prefix
+        manager.get_kernel_spec.assert_called_once_with("python")
+
+    def test_rejects_non_python_kernel(self):
+        from marimo_jupyter_extension.handlers import (
+            _resolve_kernel_environment,
+        )
+
+        manager = MagicMock()
+        manager.get_kernel_spec.return_value = SimpleNamespace(
+            language="julia", argv=["julia"], env={}
+        )
+
+        with pytest.raises(ValueError, match="not a Python environment"):
+            asyncio.run(_resolve_kernel_environment(manager, "julia"))
+
+
+class TestResolveKernelEnvironmentHandler:
+    def _build(self, body):
+        from marimo_jupyter_extension.handlers import (
+            ResolveKernelEnvironmentHandler,
+        )
+
+        application = SimpleNamespace(
+            settings={"kernel_spec_manager": MagicMock()}
+        )
+        handler = _make_handler(
+            ResolveKernelEnvironmentHandler, application=application
+        )
+        handler.request = SimpleNamespace(body=json.dumps(body).encode())
+        return handler
+
+    def test_resolves_configured_kernel(self):
+        handler = self._build({"kernel": "project"})
+
+        with patch(
+            "marimo_jupyter_extension.handlers._resolve_kernel_environment",
+            new=AsyncMock(return_value="/srv/envs/project"),
+        ) as resolve:
+            _run(handler, "post")
+
+        resolve.assert_awaited_once_with(
+            handler.kernel_spec_manager, "project"
+        )
+        handler.finish.assert_called_once_with(
+            {"success": True, "venv": "/srv/envs/project"}
+        )
+
+    def test_rejects_missing_kernel(self):
+        handler = self._build({})
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        handler.finish.assert_called_once_with(
+            {"success": False, "error": "Missing kernel"}
+        )
 
 
 class TestHasMarimoAppMarkers:
@@ -608,7 +750,7 @@ class TestSetVenvHandler:
         handler, contents_manager = self._build(
             {
                 "path": "notebook.py",
-                "venv": "/srv/envs/project/bin/python",
+                "venv": "/srv/envs/project",
             }
         )
 
@@ -709,6 +851,26 @@ class TestSetVenvHandler:
         handler.set_status.assert_called_once_with(400)
         handler.finish.assert_called_once_with(
             {"success": False, "error": "File is not a marimo notebook"}
+        )
+        contents_manager.save.assert_not_called()
+
+    def test_invalid_toml_returns_400_without_saving(self):
+        handler, contents_manager = self._build(
+            {"path": "notebook.py", "venv": "/srv/envs/project"},
+            content=(
+                "# /// script\n"
+                "# dependencies = [\n"
+                "# ///\n"
+                "import marimo\n"
+                "app = marimo.App()\n"
+            ),
+        )
+
+        _run(handler, "post")
+
+        handler.set_status.assert_called_once_with(400)
+        assert (
+            "Invalid PEP 723 TOML" in handler.finish.call_args.args[0]["error"]
         )
         contents_manager.save.assert_not_called()
 
@@ -846,7 +1008,7 @@ class TestCreateStubHandler:
             handler = self._build(
                 {
                     "path": stub_path,
-                    "venv": "/srv/envs/proj/bin/python3.13",
+                    "venv": "/srv/envs/proj",
                 },
                 settings={_DEFAULT_FILE_SETTING: template},
             )
@@ -864,7 +1026,7 @@ class TestCreateStubHandler:
             handler = self._build(
                 {
                     "path": stub_path,
-                    "venv": r"C:\Users\me\venv\Scripts\python.exe",
+                    "venv": r"C:\Users\me\venv",
                 }
             )
 
@@ -907,7 +1069,7 @@ class TestCreateStubHandler:
 
             stub_path = str(Path(tmpdir) / "out.py")
             handler = self._build(
-                {"path": stub_path, "venv": "/srv/envs/proj/bin/python3.13"},
+                {"path": stub_path, "venv": "/srv/envs/proj"},
                 settings={_DEFAULT_FILE_SETTING: cached},
             )
 
@@ -1070,6 +1232,12 @@ class TestLoadServerExtension:
         assert page_config["marimoVersion"] == "0.23.1"
         assert page_config["marimoExtensionVersion"]
         server_app.web_app.add_handlers.assert_called_once()
+        routes = server_app.web_app.add_handlers.call_args.args[1]
+        assert any(
+            path == "/marimo-tools/resolve-kernel"
+            and handler.__name__ == "ResolveKernelEnvironmentHandler"
+            for path, handler in routes
+        )
         server_app.log.info.assert_called_once()
 
     def test_marimo_version_falls_back_to_empty_string(self):
