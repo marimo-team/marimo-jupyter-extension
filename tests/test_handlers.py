@@ -2,9 +2,11 @@
 
 import asyncio
 import json
+import os
 import re
 import sys
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -644,6 +646,49 @@ class TestResolveKernelEnvironment:
 
         with pytest.raises(ValueError, match="not a Python environment"):
             asyncio.run(_resolve_kernel_environment(manager, "julia"))
+
+    @pytest.mark.skipif(os.name != "posix", reason="uses a POSIX shell")
+    def test_timeout_kills_wrapper_process_group(self):
+        from marimo_jupyter_extension.handlers import (
+            _resolve_kernel_environment,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            process_group_file = Path(tmpdir) / "process-group"
+            wrapper = Path(tmpdir) / "python-wrapper"
+            wrapper.write_text(
+                f"#!/bin/sh\necho $$ > {process_group_file}\nsleep 30\n"
+            )
+            wrapper.chmod(0o755)
+            manager = MagicMock()
+            manager.get_kernel_spec.return_value = SimpleNamespace(
+                language="python", argv=[str(wrapper)], env={}
+            )
+
+            started = time.monotonic()
+            with (
+                patch(
+                    "marimo_jupyter_extension.handlers."
+                    "_KERNEL_PREFIX_TIMEOUT_SECONDS",
+                    0.5,
+                ),
+                pytest.raises(ValueError, match="inspection timed out"),
+            ):
+                asyncio.run(
+                    _resolve_kernel_environment(manager, "wrapped-python")
+                )
+            elapsed = time.monotonic() - started
+
+            assert elapsed < 2
+            process_group = int(process_group_file.read_text())
+            for _attempt in range(100):
+                try:
+                    os.killpg(process_group, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.01)
+            else:
+                pytest.fail("wrapper process group survived timeout")
 
 
 class TestResolveKernelEnvironmentHandler:

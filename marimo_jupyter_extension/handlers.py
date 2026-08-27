@@ -4,6 +4,8 @@ import asyncio
 import json
 import os
 import re
+import signal
+import tempfile
 from collections.abc import MutableMapping
 from pathlib import Path
 from string import Template
@@ -251,6 +253,22 @@ class ConfigHandler(JupyterHandler):
         self.finish({"no_sandbox": config.no_sandbox})
 
 
+def _kill_kernel_inspection_process(
+    process: asyncio.subprocess.Process,
+) -> None:
+    """Kill an interpreter probe and its POSIX process group."""
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+            return
+        except (ProcessLookupError, PermissionError):
+            pass
+    try:
+        process.kill()
+    except ProcessLookupError:
+        pass
+
+
 async def _resolve_kernel_environment(
     kernel_spec_manager: Any, kernel_name: str
 ) -> str:
@@ -272,37 +290,41 @@ async def _resolve_kernel_environment(
             for key, value in spec.env.items()
         }
     )
-    try:
-        process = await asyncio.create_subprocess_exec(
-            spec.argv[0],
-            "-c",
-            _PRINT_SYS_PREFIX,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=environment,
-        )
-    except OSError as e:
-        raise ValueError(
-            f"Kernel interpreter did not start: {kernel_name}"
-        ) from e
+    with tempfile.TemporaryFile() as stdout:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                spec.argv[0],
+                "-c",
+                _PRINT_SYS_PREFIX,
+                stdout=stdout,
+                stderr=asyncio.subprocess.DEVNULL,
+                env=environment,
+                start_new_session=os.name == "posix",
+            )
+        except OSError as e:
+            raise ValueError(
+                f"Kernel interpreter did not start: {kernel_name}"
+            ) from e
 
-    try:
-        stdout, _stderr = await asyncio.wait_for(
-            process.communicate(), timeout=_KERNEL_PREFIX_TIMEOUT_SECONDS
-        )
-    except TimeoutError as e:
-        process.kill()
-        await process.communicate()
-        raise ValueError(
-            f"Kernel interpreter inspection timed out: {kernel_name}"
-        ) from e
+        try:
+            await asyncio.wait_for(
+                process.wait(), timeout=_KERNEL_PREFIX_TIMEOUT_SECONDS
+            )
+        except TimeoutError as e:
+            _kill_kernel_inspection_process(process)
+            await process.wait()
+            raise ValueError(
+                f"Kernel interpreter inspection timed out: {kernel_name}"
+            ) from e
 
-    if process.returncode != 0:
-        raise ValueError(
-            f"Kernel interpreter exited with an error: {kernel_name}"
-        )
+        if process.returncode != 0:
+            raise ValueError(
+                f"Kernel interpreter exited with an error: {kernel_name}"
+            )
+        stdout.seek(0)
+        output = stdout.read()
     try:
-        prefix = json.loads(stdout.decode())
+        prefix = json.loads(output.decode())
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         raise ValueError(
             f"Kernel interpreter returned an invalid prefix: {kernel_name}"
