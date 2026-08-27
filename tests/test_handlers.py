@@ -666,20 +666,13 @@ class TestResolveKernelEnvironment:
             )
 
             started = time.monotonic()
-            with (
-                patch(
-                    "marimo_jupyter_extension.handlers."
-                    "_KERNEL_PREFIX_TIMEOUT_SECONDS",
-                    0.5,
-                ),
-                pytest.raises(ValueError, match="inspection timed out"),
-            ):
+            with pytest.raises(ValueError, match="inspection timed out"):
                 asyncio.run(
                     _resolve_kernel_environment(manager, "wrapped-python")
                 )
             elapsed = time.monotonic() - started
 
-            assert elapsed < 2
+            assert elapsed < 8
             process_group = int(process_group_file.read_text())
             for _attempt in range(100):
                 try:

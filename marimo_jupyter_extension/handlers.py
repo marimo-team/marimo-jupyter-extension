@@ -310,7 +310,7 @@ async def _resolve_kernel_environment(
             await asyncio.wait_for(
                 process.wait(), timeout=_KERNEL_PREFIX_TIMEOUT_SECONDS
             )
-        except TimeoutError as e:
+        except asyncio.TimeoutError as e:
             _kill_kernel_inspection_process(process)
             await process.wait()
             raise ValueError(
