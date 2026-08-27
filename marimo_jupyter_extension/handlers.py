@@ -265,7 +265,7 @@ def _kill_kernel_inspection_process(
             pass
     try:
         process.kill()
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         pass
 
 
