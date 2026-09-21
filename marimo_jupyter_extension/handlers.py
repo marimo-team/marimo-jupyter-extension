@@ -446,10 +446,26 @@ class CreateStubHandler(JupyterHandler):
         lines.append("")
         content = "\n".join(lines)
 
+        # `path` is relative to the file-browser root. Save through the
+        # contents manager so it resolves against `ServerApp.root_dir`
+        # rather than the process CWD (they differ under JupyterHub when
+        # `Spawner.notebook_dir` is set) and rejects escapes from root.
         try:
-            file_path = Path(path)
-            file_path.write_text(content)
+            await ensure_async(
+                self.contents_manager.save(
+                    {"type": "file", "format": "text", "content": content},
+                    path,
+                )
+            )
             self.finish({"success": True, "path": path})
+        except web.HTTPError as e:
+            self.set_status(e.status_code)
+            self.finish(
+                {
+                    "success": False,
+                    "error": e.get_message() or e.reason or str(e),
+                }
+            )
         except Exception as e:
             self.set_status(500)
             self.finish({"success": False, "error": str(e)})
