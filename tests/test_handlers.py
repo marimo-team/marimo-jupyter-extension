@@ -961,25 +961,34 @@ class TestCreateStubHandler:
     handler emits the built-in boilerplate.
     """
 
-    def _build(self, body, settings=None):
+    def _build(self, body, settings=None, root_dir=None):
+        from jupyter_server.services.contents.filemanager import (
+            FileContentsManager,
+        )
+
         from marimo_jupyter_extension.handlers import CreateStubHandler
 
-        app = SimpleNamespace(settings=settings or {})
+        settings = dict(settings or {})
+        if root_dir is not None:
+            settings["contents_manager"] = FileContentsManager(
+                root_dir=root_dir
+            )
+        app = SimpleNamespace(settings=settings)
         handler = _make_handler(CreateStubHandler, application=app)
         handler.request = SimpleNamespace(body=json.dumps(body).encode())
         return handler
 
     def test_writes_default_boilerplate_when_no_template(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            stub_path = str(Path(tmpdir) / "out.py")
-            handler = self._build({"path": stub_path})
+            stub_path = Path(tmpdir) / "out.py"
+            handler = self._build({"path": "out.py"}, root_dir=tmpdir)
 
             _run(handler, "post")
 
             handler.finish.assert_called_once_with(
-                {"success": True, "path": stub_path}
+                {"success": True, "path": "out.py"}
             )
-            content = Path(stub_path).read_text()
+            content = stub_path.read_text()
             assert "import marimo" in content
             assert "__generated_with" in content
             assert 'app = marimo.App(width="medium")' in content
@@ -998,18 +1007,19 @@ class TestCreateStubHandler:
             "    app.run()\n"
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            stub_path = str(Path(tmpdir) / "out.py")
+            stub_path = Path(tmpdir) / "out.py"
             handler = self._build(
-                {"path": stub_path},
+                {"path": "out.py"},
                 settings={_DEFAULT_FILE_SETTING: template},
+                root_dir=tmpdir,
             )
 
             _run(handler, "post")
 
             handler.finish.assert_called_once_with(
-                {"success": True, "path": stub_path}
+                {"success": True, "path": "out.py"}
             )
-            assert Path(stub_path).read_text() == template
+            assert stub_path.read_text() == template
 
     def test_cached_template_does_not_substitute_version(self):
         """The cached template is emitted verbatim; the running marimo
@@ -1022,10 +1032,11 @@ class TestCreateStubHandler:
             'app = marimo.App(width="medium")\n'
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            stub_path = str(Path(tmpdir) / "out.py")
+            stub_path = Path(tmpdir) / "out.py"
             handler = self._build(
-                {"path": stub_path},
+                {"path": "out.py"},
                 settings={_DEFAULT_FILE_SETTING: template},
+                root_dir=tmpdir,
             )
             with patch(
                 "marimo_jupyter_extension.version_info.get_marimo_version",
@@ -1033,7 +1044,7 @@ class TestCreateStubHandler:
             ):
                 _run(handler, "post")
 
-            content = Path(stub_path).read_text()
+            content = stub_path.read_text()
             assert '"0.0.0-template"' in content
             assert "9.9.9" not in content
 
@@ -1042,35 +1053,37 @@ class TestCreateStubHandler:
 
         template = "import marimo\napp = marimo.App()\n"
         with tempfile.TemporaryDirectory() as tmpdir:
-            stub_path = str(Path(tmpdir) / "out.py")
+            stub_path = Path(tmpdir) / "out.py"
             handler = self._build(
                 {
-                    "path": stub_path,
+                    "path": "out.py",
                     "venv": "/srv/envs/proj",
                 },
                 settings={_DEFAULT_FILE_SETTING: template},
+                root_dir=tmpdir,
             )
 
             _run(handler, "post")
 
-            content = Path(stub_path).read_text()
+            content = stub_path.read_text()
             assert content.startswith("# /// script\n")
             assert '# path = "/srv/envs/proj"\n' in content
             assert content.endswith(template)
 
     def test_windows_venv_path_is_toml_escaped(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            stub_path = str(Path(tmpdir) / "out.py")
+            stub_path = Path(tmpdir) / "out.py"
             handler = self._build(
                 {
-                    "path": stub_path,
+                    "path": "out.py",
                     "venv": r"C:\Users\me\venv",
-                }
+                },
+                root_dir=tmpdir,
             )
 
             _run(handler, "post")
 
-            content = Path(stub_path).read_text()
+            content = stub_path.read_text()
             assert '# path = "C:\\\\Users\\\\me\\\\venv"\n' in content
 
     def test_no_duplicate_pep723_when_template_has_block(self, clean_env):
@@ -1105,15 +1118,16 @@ class TestCreateStubHandler:
             ):
                 cached = _load_default_file(server_app)
 
-            stub_path = str(Path(tmpdir) / "out.py")
+            stub_path = Path(tmpdir) / "out.py"
             handler = self._build(
-                {"path": stub_path, "venv": "/srv/envs/proj"},
+                {"path": "out.py", "venv": "/srv/envs/proj"},
                 settings={_DEFAULT_FILE_SETTING: cached},
+                root_dir=tmpdir,
             )
 
             _run(handler, "post")
 
-            content = Path(stub_path).read_text()
+            content = stub_path.read_text()
             assert content.count("# /// script") == 1
             # The request-time venv wins; the template's stale path is gone.
             assert '# path = "/srv/envs/proj"' in content
@@ -1132,7 +1146,7 @@ class TestCreateStubHandler:
     def test_rejects_markdown_filename(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             stub_path = Path(tmpdir) / "out.md"
-            handler = self._build({"path": str(stub_path)})
+            handler = self._build({"path": "out.md"}, root_dir=tmpdir)
 
             _run(handler, "post")
 
@@ -1144,6 +1158,46 @@ class TestCreateStubHandler:
                 }
             )
             assert not stub_path.exists()
+
+    def test_writes_relative_to_contents_root_not_cwd(self, monkeypatch):
+        """The frontend sends paths relative to the file-browser root.
+
+        Under JupyterHub the single-user server's CWD is the user's home
+        while `ServerApp.root_dir` is `Spawner.notebook_dir`; the stub
+        must land under the latter.
+        """
+        with (
+            tempfile.TemporaryDirectory() as root,
+            tempfile.TemporaryDirectory() as cwd,
+        ):
+            monkeypatch.chdir(cwd)
+            (Path(root) / "proj" / "notes").mkdir(parents=True)
+            handler = self._build(
+                {"path": "proj/notes/test.py"}, root_dir=root
+            )
+
+            _run(handler, "post")
+
+            handler.finish.assert_called_once_with(
+                {"success": True, "path": "proj/notes/test.py"}
+            )
+            assert (Path(root) / "proj" / "notes" / "test.py").exists()
+            assert not (Path(cwd) / "proj" / "notes" / "test.py").exists()
+
+    def test_rejects_path_outside_contents_root(self):
+        with tempfile.TemporaryDirectory() as root:
+            handler = self._build({"path": "../escape.py"}, root_dir=root)
+
+            _run(handler, "post")
+
+            handler.set_status.assert_called_once_with(404)
+            handler.finish.assert_called_once_with(
+                {
+                    "success": False,
+                    "error": "../escape.py is outside root contents directory",
+                }
+            )
+            assert not (Path(root).parent / "escape.py").exists()
 
 
 class TestLoadDefaultFile:
