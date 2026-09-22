@@ -52,23 +52,76 @@ which jupyter
 
 **Cause**: marimo runs in sandbox mode by default, which creates an isolated temporary venv per notebook. Native libraries, ADBC drivers, and packages already installed in your project venv are not visible inside the sandbox.
 
-**Solution**: Disable sandbox mode.
+**Solution**: Disable sandbox mode, or switch to the pixi backend if the
+packages are available from conda-forge (see
+[Using pixi](configuration.md#using-pixi)).
 
 For standalone JupyterLab (no JupyterHub), pass a CLI flag when launching:
 
 ```bash
-jupyter lab --MarimoProxyConfig.no_sandbox=True
+jupyter lab --MarimoProxyConfig.sandbox=None
 ```
 
 Or add it permanently to `jupyter_server_config.py` (run `jupyter --config-dir` to locate it):
 
 ```python
-c.MarimoProxyConfig.no_sandbox = True
+c.MarimoProxyConfig.sandbox = None
 ```
 
-For JupyterHub, add the same line to `jupyterhub_config.py`.
+For JupyterHub, add the same line to `jupyterhub_config.py`. The older
+`c.MarimoProxyConfig.no_sandbox = True` still works as a deprecated alias.
 
 > **Note**: Disabling sandbox mode removes per-notebook dependency management and the venv picker. Consider setting up a shared virtual environment instead if you need dependency isolation.
+
+### pixi backend: "pixi executable not found"
+
+**Cause**: `sandbox = "pixi"` is set but the extension found no pixi binary via
+`pixi_path`, `PATH`, `$PIXI_HOME/bin`, `~/.pixi/bin`, `/opt/pixi/bin`, or
+`/usr/local/bin`. The extension raises this `FileNotFoundError` when Jupyter
+Server loads it, so the marimo launcher entry never appears.
+
+**Solution**: Install `pixi>=0.80` (`curl -fsSL https://pixi.sh/install.sh | sh`)
+where the spawned server runs, then either add its `bin` directory to the
+spawner `PATH` or set:
+
+```python
+c.MarimoProxyConfig.pixi_path = "/opt/pixi/bin/pixi"
+```
+
+### pixi backend: marimo exits with "No such option" or "Invalid value for '--sandbox'"
+
+**Cause**: The installed marimo predates the pixi backend. Releases up to
+0.23.x accept only a bare `--sandbox` (uv).
+
+**Solution**: Install a marimo build that includes the pixi backend (marimo
+`main` at the time of writing), or set `c.MarimoProxyConfig.sandbox = "uv"`.
+
+### pixi backend: "--sandbox=pixi requires a pixi with `pixi install --script` support"
+
+**Cause**: pixi is older than 0.80.
+
+**Solution**: `pixi self-update`, or reinstall from https://pixi.sh.
+
+### pixi backend: first launch returns 502/500 after several minutes
+
+**Cause**: The startup timeout expired while pixi was still solving or
+downloading the conda environment. The proxy kills the process, leaving a
+partial cache; the next launch restarts the solve.
+
+**Solution**: The default is already 300 s under pixi. Raise
+`c.MarimoProxyConfig.timeout` further, and set `PIXI_CACHE_DIR` in the spawner
+environment to a persistent volume so later launches hit a warm cache. Enable
+[debug mode](#debug-mode) to see pixi's output in the server log.
+
+### pixi backend: conda package imports but misbehaves
+
+**Cause**: marimo does not run conda activation scripts inside the sandbox, so
+packages that expect variables such as `PROJ_LIB` or `GDAL_DATA` from
+activation find them unset.
+
+**Solution**: Set those variables in the spawner environment
+(`c.SystemdSpawner.environment`). Note also that most `marimo export` targets
+support only the uv backend.
 
 ### Cannot find jupyterhub_config.py
 

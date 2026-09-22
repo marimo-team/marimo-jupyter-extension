@@ -2,12 +2,15 @@
 
 import os
 import socket
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from jupyter_server.utils import url_path_join
 from traitlets import (
     Bool,
+    Enum,
     Float,
     Int,
     List,
@@ -19,6 +22,11 @@ from traitlets import (
 from traitlets.config import Configurable
 
 DEFAULT_TIMEOUT = 60
+# pixi cold starts (`pixi exec` fetching uv, conda solve, uv overlay build)
+# routinely exceed the uv default before the HTTP port opens.
+DEFAULT_PIXI_TIMEOUT = 300
+
+SandboxBackend = Literal["uv", "pixi"]
 
 
 def _detect_localhost_host() -> str | None:
@@ -43,6 +51,7 @@ class MarimoProxyConfig(Configurable):
     Can be configured in jupyterhub_config.py:
         c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
         c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"  # enables uvx mode
+        c.MarimoProxyConfig.sandbox = "pixi"  # or "uv" (default), or None
         c.MarimoProxyConfig.timeout = 120
         c.MarimoProxyConfig.debug = True
     """
@@ -60,9 +69,22 @@ class MarimoProxyConfig(Configurable):
         ),
     ).tag(config=True)
 
+    pixi_path = Unicode(
+        allow_none=True,
+        help=(
+            "Explicit path to the pixi executable used by `sandbox = 'pixi'`. "
+            "If not set, searches PATH, `$PIXI_HOME/bin`, and common "
+            "locations (`~/.pixi/bin`, `/opt/pixi/bin`, `/usr/local/bin`)."
+        ),
+    ).tag(config=True)
+
     timeout = Int(
         DEFAULT_TIMEOUT,
-        help="Timeout in seconds for marimo to start.",
+        help=(
+            "Timeout in seconds for marimo to start. Defaults to "
+            f"{DEFAULT_TIMEOUT} s, or {DEFAULT_PIXI_TIMEOUT} s when "
+            "`sandbox = 'pixi'` (cold conda solves are slow)."
+        ),
     ).tag(config=True)
 
     debug = Bool(
@@ -73,10 +95,26 @@ class MarimoProxyConfig(Configurable):
         ),
     ).tag(config=True)
 
+    sandbox = Enum(
+        ["uv", "pixi"],
+        default_value="uv",
+        allow_none=True,
+        help=(
+            "Sandbox backend marimo uses to provision per-notebook "
+            "environments from PEP 723 metadata: 'uv' (the default) or "
+            "'pixi' (conda script environments; requires pixi>=0.80 and a "
+            "marimo release with the pixi backend). None starts marimo "
+            "without sandboxing."
+        ),
+    ).tag(config=True)
+
     no_sandbox = Bool(
         default_value=False,
         allow_none=True,
-        help="Start marimo without sandboxing",
+        help=(
+            "Deprecated alias for `sandbox = None`. "
+            "Start marimo without sandboxing."
+        ),
     ).tag(config=True)
 
     host = Unicode(
@@ -180,9 +218,41 @@ class MarimoProxyConfig(Configurable):
             return str(Path(uv_path).parent / "uvx")
         return None
 
+    @default("pixi_path")
+    def _default_pixi_path(self):
+        return None
+
     @default("timeout")
     def _default_timeout(self):
         return DEFAULT_TIMEOUT
+
+    def resolve_sandbox(self) -> SandboxBackend | None:
+        """Effective sandbox backend after applying the `no_sandbox` alias.
+
+        `no_sandbox = True` wins and yields None. A conflicting explicit
+        `sandbox` value is reported with a warning rather than an error so
+        existing `no_sandbox` deployments keep starting.
+        """
+        # Check before reading `sandbox`: traitlets materializes defaults
+        # lazily, so an unread trait has a value only when it was set.
+        sandbox_explicit = self.trait_has_value("sandbox")
+        if not self.no_sandbox:
+            return self.sandbox
+        if sandbox_explicit and self.sandbox is not None:
+            warnings.warn(
+                "MarimoProxyConfig.no_sandbox=True overrides "
+                f"MarimoProxyConfig.sandbox={self.sandbox!r}; marimo starts "
+                "without a sandbox. no_sandbox is deprecated: set "
+                "sandbox = None instead and drop no_sandbox.",
+                stacklevel=2,
+            )
+        return None
+
+    def resolve_timeout(self, sandbox: SandboxBackend | None) -> int:
+        """Startup timeout, widened for pixi unless set explicitly."""
+        if self.trait_has_value("timeout"):
+            return self.timeout
+        return DEFAULT_PIXI_TIMEOUT if sandbox == "pixi" else self.timeout
 
 
 @dataclass(frozen=True)
@@ -194,7 +264,8 @@ class Config:
     timeout: int
     base_url: str
     debug: bool = False
-    no_sandbox: bool = False  # Keep sandbox as default
+    sandbox: SandboxBackend | None = "uv"  # None disables sandboxing
+    pixi_path: str | None = None  # Explicit pixi path (sandbox="pixi")
     host: str | None = (
         None  # None = omit --host flag, let marimo use its default
     )
@@ -205,6 +276,11 @@ class Config:
     session_ttl: int | None = None
     transport: str = "websocket"
     default_file: str | None = None
+
+    @property
+    def no_sandbox(self) -> bool:
+        """True when marimo runs without any sandbox backend."""
+        return self.sandbox is None
 
 
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
@@ -222,13 +298,15 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         except Exception:
             cfg = MarimoProxyConfig()
 
+    sandbox = cfg.resolve_sandbox()
     return Config(
         marimo_path=cfg.marimo_path,
         uvx_path=cfg.uvx_path,
-        timeout=cfg.timeout,
+        timeout=cfg.resolve_timeout(sandbox),
         base_url=_get_base_url(),
         debug=bool(cfg.debug),
-        no_sandbox=bool(cfg.no_sandbox),
+        sandbox=sandbox,
+        pixi_path=cfg.pixi_path,
         host=cfg.host,
         watch=bool(cfg.watch),
         allow_origins=tuple(cfg.allow_origins),

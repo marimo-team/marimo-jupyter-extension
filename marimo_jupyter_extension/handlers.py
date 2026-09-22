@@ -245,12 +245,17 @@ class ConfigHandler(JupyterHandler):
         """Return extension configuration.
 
         GET /marimo-tools/config
-        Response: {"no_sandbox": bool}
+        Response: {"no_sandbox": bool, "sandbox": "uv" | "pixi" | null}
+
+        `no_sandbox` is kept for older frontends; it equals
+        `sandbox is None`.
         """
         from .config import get_config
 
         config = get_config()
-        self.finish({"no_sandbox": config.no_sandbox})
+        self.finish(
+            {"no_sandbox": config.no_sandbox, "sandbox": config.sandbox}
+        )
 
 
 def _kill_kernel_inspection_process(

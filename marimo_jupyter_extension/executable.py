@@ -1,5 +1,6 @@
-"""Executable discovery for marimo."""
+"""Executable discovery for marimo and pixi."""
 
+import os
 import shutil
 from pathlib import Path
 
@@ -13,6 +14,14 @@ COMMON_LOCATIONS = [
     "~/.local/bin/marimo",
     "/opt/bin/marimo",
     "/usr/local/bin/marimo",
+]
+
+# Where the pixi installer (https://pixi.sh/install.sh) and image layers
+# usually put the binary. `$PIXI_HOME/bin` is checked first when set.
+PIXI_COMMON_LOCATIONS = [
+    "~/.pixi/bin/pixi",
+    "/opt/pixi/bin/pixi",
+    "/usr/local/bin/pixi",
 ]
 
 
@@ -62,6 +71,45 @@ def _find_marimo() -> str | None:
     for location in COMMON_LOCATIONS:
         candidate = Path(location).expanduser()
         if candidate.exists() and candidate.is_file():
+            return str(candidate)
+
+    return None
+
+
+def get_pixi_path(config: Config) -> str:
+    """Path to the pixi executable required by `sandbox = "pixi"`.
+
+    Raises:
+        FileNotFoundError: pixi is not configured and not discoverable.
+    """
+    if found := find_pixi(config):
+        return found
+
+    raise FileNotFoundError(
+        "pixi executable not found, but MarimoProxyConfig.sandbox is "
+        "'pixi'.\n"
+        "Solutions:\n"
+        "  - Install pixi>=0.80: curl -fsSL https://pixi.sh/install.sh | sh\n"
+        "  - Add pixi's bin directory (e.g. ~/.pixi/bin) to the spawner PATH\n"
+        "  - Configure MarimoProxyConfig.pixi_path in jupyterhub_config.py\n"
+        "  - Or select the uv backend: MarimoProxyConfig.sandbox = 'uv'"
+    )
+
+
+def find_pixi(config: Config) -> str | None:
+    """Locate pixi: explicit `pixi_path`, then PATH, then common locations."""
+    if config.pixi_path:
+        return config.pixi_path
+
+    if which := shutil.which("pixi"):
+        return which
+
+    candidates = list(PIXI_COMMON_LOCATIONS)
+    if pixi_home := os.environ.get("PIXI_HOME"):
+        candidates.insert(0, str(Path(pixi_home) / "bin" / "pixi"))
+    for location in candidates:
+        candidate = Path(location).expanduser()
+        if candidate.is_file():
             return str(candidate)
 
     return None

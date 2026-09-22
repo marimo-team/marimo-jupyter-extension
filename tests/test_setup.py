@@ -1,7 +1,10 @@
 """Tests for the setup_marimoserver() function."""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 
 class TestSetupMarimoserver:
@@ -85,10 +88,10 @@ class TestSetupMarimoserver:
 
         assert "--sandbox" in result["command"]
 
-    def test_command_excludes_sandbox_when_no_sandbox(
+    def test_command_excludes_sandbox_when_sandbox_is_none(
         self, clean_env, mock_marimo_in_path
     ):
-        """Command should omit --sandbox when no_sandbox is True."""
+        """Command should omit every --sandbox spelling when sandbox is None."""
         from marimo_jupyter_extension.config import Config
 
         mock_config = Config(
@@ -96,7 +99,7 @@ class TestSetupMarimoserver:
             uvx_path=None,
             timeout=60,
             base_url="/marimo",
-            no_sandbox=True,
+            sandbox=None,
         )
 
         with patch(
@@ -107,7 +110,34 @@ class TestSetupMarimoserver:
 
             result = setup_marimoserver()
 
-        assert "--sandbox" not in result["command"]
+        assert not [a for a in result["command"] if a.startswith("--sandbox")]
+
+    def test_uv_backend_emits_bare_sandbox_flag(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """sandbox='uv' must stay a bare --sandbox for marimo<=0.23 compat."""
+        from marimo_jupyter_extension.config import Config
+
+        mock_config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            sandbox="uv",
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_config",
+            return_value=mock_config,
+        ):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            result = setup_marimoserver()
+
+        cmd = result["command"]
+        assert "--sandbox" in cmd
+        assert "--sandbox=uv" not in cmd
+        assert "uv" not in cmd
 
     def test_command_excludes_log_level_by_default(
         self, clean_env, mock_marimo_in_path
@@ -145,6 +175,127 @@ class TestSetupMarimoserver:
         assert "--log-level" in cmd
         assert cmd[cmd.index("--log-level") + 1] == "DEBUG"
         assert cmd.index("--log-level") < cmd.index("edit")
+
+
+class TestPixiSandbox:
+    """Tests for sandbox='pixi': flag spelling, PATH injection, discovery."""
+
+    @staticmethod
+    def _pixi_config(marimo_path, **overrides):
+        from marimo_jupyter_extension.config import Config
+
+        return Config(
+            marimo_path=marimo_path,
+            uvx_path=None,
+            timeout=300,
+            base_url="/marimo",
+            sandbox="pixi",
+            **overrides,
+        )
+
+    def _setup(self, config):
+        with patch("marimo_jupyter_extension.get_config", return_value=config):
+            from marimo_jupyter_extension import setup_marimoserver
+
+            return setup_marimoserver()
+
+    def test_pixi_backend_uses_equals_form(
+        self, clean_env, temp_bin_dir, temp_pixi_path
+    ):
+        """pixi must be spelled --sandbox=pixi, not a positional value."""
+        marimo = str(Path(temp_bin_dir) / "marimo")
+        config = self._pixi_config(marimo, pixi_path=temp_pixi_path)
+
+        with patch("shutil.which", return_value=None):
+            result = self._setup(config)
+
+        cmd = result["command"]
+        assert "--sandbox=pixi" in cmd
+        assert "--sandbox" not in cmd
+        assert "pixi" not in cmd
+        assert cmd.index("--sandbox=pixi") > cmd.index("edit")
+
+    def test_pixi_path_outside_path_is_prepended_to_path(
+        self, clean_env, temp_bin_dir, temp_pixi_path
+    ):
+        """marimo finds pixi via which(), so its directory must lead PATH."""
+        marimo = str(Path(temp_bin_dir) / "marimo")
+        config = self._pixi_config(marimo, pixi_path=temp_pixi_path)
+
+        with (
+            patch("shutil.which", return_value=None),
+            patch.dict(os.environ, {"PATH": "/usr/bin:/bin"}),
+        ):
+            result = self._setup(config)
+
+        env = result["environment"]
+        assert env["MARIMO_SERVER_TRANSPORT"] == "websocket"
+        assert env["PATH"].split(os.pathsep) == [
+            str(Path(temp_pixi_path).parent),
+            "/usr/bin",
+            "/bin",
+        ]
+
+    def test_pixi_path_overrides_different_pixi_on_path(
+        self, clean_env, temp_bin_dir, temp_pixi_path
+    ):
+        """An explicit pixi_path must shadow another pixi already on PATH."""
+        marimo = str(Path(temp_bin_dir) / "marimo")
+        config = self._pixi_config(marimo, pixi_path=temp_pixi_path)
+
+        with patch("shutil.which", return_value="/usr/bin/pixi"):
+            result = self._setup(config)
+
+        assert result["environment"]["PATH"].startswith(
+            str(Path(temp_pixi_path).parent) + os.pathsep
+        )
+
+    def test_pixi_on_path_leaves_path_untouched(self, clean_env, temp_bin_dir):
+        """When which() already finds the chosen pixi, PATH is not overridden."""
+        marimo = str(Path(temp_bin_dir) / "marimo")
+        config = self._pixi_config(marimo)
+
+        with patch("shutil.which", return_value="/usr/local/bin/pixi"):
+            result = self._setup(config)
+
+        assert "PATH" not in result["environment"]
+        assert "--sandbox=pixi" in result["command"]
+
+    def test_pixi_missing_raises_actionable_error(
+        self, clean_env, temp_bin_dir, mock_pixi_not_found
+    ):
+        """sandbox='pixi' without pixi must fail fast with install hints."""
+        marimo = str(Path(temp_bin_dir) / "marimo")
+        config = self._pixi_config(marimo)
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            self._setup(config)
+
+        message = str(exc_info.value)
+        assert "pixi executable not found" in message
+        assert "https://pixi.sh" in message
+        assert "MarimoProxyConfig.pixi_path" in message
+
+    def test_uv_backend_never_probes_pixi(self, clean_env, temp_bin_dir):
+        """The default backend must not require pixi to be installed."""
+        from marimo_jupyter_extension.config import Config
+
+        marimo = str(Path(temp_bin_dir) / "marimo")
+        config = Config(
+            marimo_path=marimo,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            sandbox="uv",
+        )
+
+        with patch(
+            "marimo_jupyter_extension.get_pixi_path",
+            side_effect=AssertionError("pixi lookup must not run"),
+        ):
+            result = self._setup(config)
+
+        assert "PATH" not in result["environment"]
 
 
 class TestTransportEnvironment:

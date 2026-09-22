@@ -23,6 +23,14 @@ apt install -y nodejs npm nginx certbot python3-certbot-nginx
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
+Optional, for the pixi sandbox backend (conda packages per notebook; see
+[Using pixi](configuration.md#using-pixi)):
+
+```bash
+# Installs pixi>=0.80 system-wide at /opt/pixi/bin/pixi
+PIXI_HOME=/opt/pixi curl -fsSL https://pixi.sh/install.sh | sh
+```
+
 ### Create System Users
 
 ```bash
@@ -127,6 +135,22 @@ example:
 # marimo>=0.23.14). Defaults to "websocket".
 c.MarimoProxyConfig.transport = "sse"
 ```
+
+To give each notebook a conda environment instead of a uv venv, switch the
+sandbox backend to pixi. This needs a marimo build with the pixi backend
+(marimo `main` at the time of writing; 0.23.x releases reject
+`--sandbox=pixi`) and `pixi>=0.80` reachable by the spawned server:
+
+```python
+c.MarimoProxyConfig.sandbox = "pixi"
+# Either add "/opt/pixi/bin" to the PATH above, or point at the binary:
+c.MarimoProxyConfig.pixi_path = "/opt/pixi/bin/pixi"
+# Keep solved conda environments across restarts (default: ~/.cache/rattler).
+c.SystemdSpawner.environment["PIXI_CACHE_DIR"] = "/opt/notebooks/.cache/pixi"
+```
+
+The startup timeout defaults to 300 s under pixi (60 s for uv) because the
+first launch solves and downloads a conda environment before marimo answers.
 
 ## Part 3: SSL & Reverse Proxy
 

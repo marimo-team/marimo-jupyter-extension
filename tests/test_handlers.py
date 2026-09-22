@@ -69,6 +69,39 @@ class TestHandlers:
         assert ConvertHandler is not None
 
 
+class TestConfigHandler:
+    """Tests for GET /marimo-tools/config."""
+
+    @staticmethod
+    def _get(sandbox):
+        from marimo_jupyter_extension.config import Config
+        from marimo_jupyter_extension.handlers import ConfigHandler
+
+        config = Config(
+            marimo_path="/opt/bin/marimo",
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            sandbox=sandbox,
+        )
+        handler = _make_handler(ConfigHandler)
+        with patch(
+            "marimo_jupyter_extension.config.get_config", return_value=config
+        ):
+            _run(handler, "get")
+        return handler.finish.call_args.args[0]
+
+    def test_reports_pixi_backend(self):
+        """The frontend needs the backend name, plus no_sandbox for compat."""
+        assert self._get("pixi") == {"no_sandbox": False, "sandbox": "pixi"}
+
+    def test_reports_uv_backend(self):
+        assert self._get("uv") == {"no_sandbox": False, "sandbox": "uv"}
+
+    def test_reports_disabled_sandbox(self):
+        assert self._get(None) == {"no_sandbox": True, "sandbox": None}
+
+
 class TestConvertHandler:
     """Test suite for ConvertHandler."""
 

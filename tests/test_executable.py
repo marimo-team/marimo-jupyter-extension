@@ -134,3 +134,88 @@ class TestFindMarimo:
             result = _find_marimo()
 
         assert result is None
+
+
+class TestFindPixi:
+    """Test suite for find_pixi() and get_pixi_path()."""
+
+    @staticmethod
+    def _config(pixi_path=None):
+        from marimo_jupyter_extension.config import Config
+
+        return Config(
+            marimo_path="/opt/bin/marimo",
+            uvx_path=None,
+            timeout=300,
+            base_url="/marimo",
+            sandbox="pixi",
+            pixi_path=pixi_path,
+        )
+
+    def test_explicit_pixi_path_wins(self, clean_env, mock_pixi_not_found):
+        """pixi_path is returned as-is, ahead of PATH and common locations."""
+        from marimo_jupyter_extension.executable import find_pixi
+
+        assert find_pixi(self._config("/custom/pixi")) == "/custom/pixi"
+
+    def test_finds_in_system_path(self, clean_env):
+        """Should find pixi via shutil.which("pixi")."""
+        from marimo_jupyter_extension.executable import find_pixi
+
+        def which(name):
+            return "/usr/local/bin/pixi" if name == "pixi" else None
+
+        with patch(
+            "marimo_jupyter_extension.executable.shutil.which",
+            side_effect=which,
+        ):
+            assert find_pixi(self._config()) == "/usr/local/bin/pixi"
+
+    def test_finds_in_pixi_home(
+        self, clean_env, mock_pixi_not_found, tmp_path, monkeypatch
+    ):
+        """$PIXI_HOME/bin/pixi should be checked before common locations."""
+        from marimo_jupyter_extension.executable import find_pixi
+
+        pixi = tmp_path / "bin" / "pixi"
+        pixi.parent.mkdir()
+        pixi.write_text("")
+        monkeypatch.setenv("PIXI_HOME", str(tmp_path))
+
+        assert find_pixi(self._config()) == str(pixi)
+
+    def test_finds_in_common_locations(self, clean_env, temp_pixi_path):
+        """Should fall back to PIXI_COMMON_LOCATIONS when not on PATH."""
+        from marimo_jupyter_extension.executable import find_pixi
+
+        with (
+            patch(
+                "marimo_jupyter_extension.executable.shutil.which",
+                return_value=None,
+            ),
+            patch(
+                "marimo_jupyter_extension.executable.PIXI_COMMON_LOCATIONS",
+                ["/nonexistent/pixi", temp_pixi_path],
+            ),
+        ):
+            assert find_pixi(self._config()) == temp_pixi_path
+
+    def test_returns_none_when_not_found(self, clean_env, mock_pixi_not_found):
+        """Should return None when pixi is nowhere to be found."""
+        from marimo_jupyter_extension.executable import find_pixi
+
+        assert find_pixi(self._config()) is None
+
+    def test_get_pixi_path_raises_with_hints(
+        self, clean_env, mock_pixi_not_found
+    ):
+        """get_pixi_path should raise FileNotFoundError with install hints."""
+        from marimo_jupyter_extension.executable import get_pixi_path
+
+        with pytest.raises(FileNotFoundError) as exc_info:
+            get_pixi_path(self._config())
+
+        message = str(exc_info.value)
+        assert "https://pixi.sh" in message
+        assert "MarimoProxyConfig.pixi_path" in message
+        assert "sandbox = 'uv'" in message

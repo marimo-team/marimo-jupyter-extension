@@ -37,8 +37,11 @@ HARDCODED_OPTIONS: set[str] = {
 
 # Mapped to MarimoProxyConfig traitlets in config.py — user-configurable.
 EXPOSED_OPTIONS: set[str] = {
+    # config: sandbox. Bare `--sandbox` for uv (marimo<=0.23 compatible),
+    # `--sandbox=pixi` for pixi; marimo>=0.24 renders it as
+    # `--sandbox [uv|pixi]`, which the flag regex still reduces to `--sandbox`.
     "--sandbox",
-    "--no-sandbox",  # config: no_sandbox (default: sandbox on)
+    "--no-sandbox",  # config: sandbox = None (legacy alias: no_sandbox)
     "--host",  # config: host (auto-detected localhost)
     "--watch",  # config: watch
     "--allow-origins",  # config: allow_origins
