@@ -28,7 +28,7 @@ Optional, for the pixi sandbox backend (conda packages per notebook; see
 
 ```bash
 # Installs pixi>=0.80 system-wide at /opt/pixi/bin/pixi
-PIXI_HOME=/opt/pixi curl -fsSL https://pixi.sh/install.sh | sh
+curl -fsSL https://pixi.sh/install.sh | PIXI_HOME=/opt/pixi sh
 ```
 
 ### Create System Users
