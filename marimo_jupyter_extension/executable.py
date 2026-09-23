@@ -6,9 +6,9 @@ from pathlib import Path
 
 from .config import Config
 
-# Single source of truth for the marimo version this extension targets.
-# scripts/bump-marimo.sh updates this literal alongside the README docs.
+# Minimum marimo version for uv or disabled sandboxing.
 MARIMO_VERSION = "0.23.14"
+PIXI_MARIMO_MIN_VERSION = "0.25.0"
 
 COMMON_LOCATIONS = [
     "~/.local/bin/marimo",
@@ -42,7 +42,12 @@ def get_marimo_command(config: Config) -> list[str]:
     """
     # uvx mode (opt-in via explicit uvx_path)
     if config.uvx_path:
-        return [config.uvx_path, f"marimo[sandbox]>={MARIMO_VERSION}"]
+        version = (
+            PIXI_MARIMO_MIN_VERSION
+            if config.sandbox == "pixi"
+            else MARIMO_VERSION
+        )
+        return [config.uvx_path, f"marimo[sandbox]>={version}"]
 
     # Explicit marimo path
     if config.marimo_path:
@@ -99,7 +104,10 @@ def get_pixi_path(config: Config) -> str:
 def find_pixi(config: Config) -> str | None:
     """Locate pixi: explicit `pixi_path`, then PATH, then common locations."""
     if config.pixi_path:
-        return config.pixi_path
+        candidate = Path(config.pixi_path).expanduser()
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+        return None
 
     if which := shutil.which("pixi"):
         return which
@@ -109,7 +117,7 @@ def find_pixi(config: Config) -> str | None:
         candidates.insert(0, str(Path(pixi_home) / "bin" / "pixi"))
     for location in candidates:
         candidate = Path(location).expanduser()
-        if candidate.is_file():
+        if candidate.is_file() and os.access(candidate, os.X_OK):
             return str(candidate)
 
     return None

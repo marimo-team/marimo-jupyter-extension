@@ -147,13 +147,22 @@ guide for the notebook side.
 
 **Requirements**
 
-- A marimo release that includes the pixi backend. At the time of writing this
-  is only on marimo `main` (unreleased); the latest release, 0.23.13, rejects
-  `--sandbox=pixi`. The `--sandbox` flag itself needs `marimo>=0.23.14`.
+> **Warning:** Upgrade to `marimo>=0.25.0` before selecting `sandbox = "pixi"`.
+> Older releases reject `--sandbox=pixi`.
+
+- `marimo>=0.25.0` for Pixi, or `marimo>=0.23.14` for uv.
 - `pixi>=0.80`, which adds `pixi install --script`. marimo probes for it at
   startup and fails otherwise.
 - Network access to conda-forge (or a mirror configured in pixi's global
   config) from the spawned server.
+
+With `uvx_path`, the extension requests `marimo[sandbox]>=0.25.0` for Pixi so
+uvx cannot reuse an older installed version. With `marimo_path` or PATH
+discovery, upgrade marimo in that environment:
+
+```bash
+uv pip install --upgrade "marimo[sandbox]>=0.25.0"
+```
 
 **Install pixi where the spawned server can see it**
 

@@ -136,10 +136,11 @@ example:
 c.MarimoProxyConfig.transport = "sse"
 ```
 
-To give each notebook a conda environment instead of a uv venv, switch the
-sandbox backend to pixi. This needs a marimo build with the pixi backend
-(marimo `main` at the time of writing; 0.23.x releases reject
-`--sandbox=pixi`) and `pixi>=0.80` reachable by the spawned server:
+To give each notebook a conda environment, switch the sandbox backend to pixi.
+The spawned server needs `marimo>=0.25.0` and `pixi>=0.80`.
+
+> **Warning:** Upgrade marimo before selecting Pixi.
+> Older releases reject `--sandbox=pixi`.
 
 ```python
 c.MarimoProxyConfig.sandbox = "pixi"

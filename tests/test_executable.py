@@ -9,8 +9,12 @@ import pytest
 class TestGetMarimoCommand:
     """Test suite for get_marimo_command() function."""
 
-    def test_uvx_mode_with_uvx_path(self, clean_env):
-        """When uvx_path set, return [uvx_path, 'marimo[sandbox]...']."""
+    @pytest.mark.parametrize(
+        ("sandbox", "minimum"),
+        [("uv", "0.23.14"), ("pixi", "0.25.0"), (None, "0.23.14")],
+    )
+    def test_uvx_mode_with_uvx_path(self, clean_env, sandbox, minimum):
+        """Select a marimo version that supports the sandbox backend."""
         from marimo_jupyter_extension.config import Config
         from marimo_jupyter_extension.executable import get_marimo_command
 
@@ -19,12 +23,11 @@ class TestGetMarimoCommand:
             uvx_path="/usr/local/bin/uvx",
             timeout=60,
             base_url="/marimo",
+            sandbox=sandbox,
         )
         result = get_marimo_command(config)
 
-        assert len(result) == 2
-        assert result[0] == "/usr/local/bin/uvx"
-        assert result[1].startswith("marimo[sandbox]")
+        assert result == ["/usr/local/bin/uvx", f"marimo[sandbox]>={minimum}"]
 
     def test_explicit_marimo_path(self, clean_env):
         """When marimo_path is set, should return [marimo_path]."""
@@ -152,11 +155,31 @@ class TestFindPixi:
             pixi_path=pixi_path,
         )
 
-    def test_explicit_pixi_path_wins(self, clean_env, mock_pixi_not_found):
-        """pixi_path is returned as-is, ahead of PATH and common locations."""
+    def test_explicit_pixi_path_wins(
+        self, clean_env, mock_pixi_not_found, temp_pixi_path
+    ):
+        """Use the configured executable before searching for pixi."""
         from marimo_jupyter_extension.executable import find_pixi
 
-        assert find_pixi(self._config("/custom/pixi")) == "/custom/pixi"
+        assert find_pixi(self._config(temp_pixi_path)) == temp_pixi_path
+
+    @pytest.mark.parametrize("kind", ["missing", "directory", "nonexecutable"])
+    def test_invalid_explicit_pixi_path_raises(
+        self, clean_env, mock_pixi_not_found, tmp_path, kind
+    ):
+        from marimo_jupyter_extension.executable import get_pixi_path
+
+        pixi = tmp_path / "pixi"
+        if kind == "directory":
+            pixi.mkdir()
+        elif kind == "nonexecutable":
+            pixi.write_text("#!/bin/sh\n")
+            pixi.chmod(0o644)
+
+        with pytest.raises(
+            FileNotFoundError, match="pixi executable not found"
+        ):
+            get_pixi_path(self._config(str(pixi)))
 
     def test_finds_in_system_path(self, clean_env):
         """Should find pixi via shutil.which("pixi")."""
@@ -180,13 +203,20 @@ class TestFindPixi:
         pixi = tmp_path / "bin" / "pixi"
         pixi.parent.mkdir()
         pixi.write_text("")
+        pixi.chmod(0o755)
         monkeypatch.setenv("PIXI_HOME", str(tmp_path))
 
         assert find_pixi(self._config()) == str(pixi)
 
-    def test_finds_in_common_locations(self, clean_env, temp_pixi_path):
-        """Should fall back to PIXI_COMMON_LOCATIONS when not on PATH."""
+    def test_finds_in_common_locations(
+        self, clean_env, temp_pixi_path, tmp_path
+    ):
+        """Skip files that cannot execute when searching common locations."""
         from marimo_jupyter_extension.executable import find_pixi
+
+        nonexecutable = tmp_path / "pixi"
+        nonexecutable.write_text("#!/bin/sh\n")
+        nonexecutable.chmod(0o644)
 
         with (
             patch(
@@ -195,7 +225,7 @@ class TestFindPixi:
             ),
             patch(
                 "marimo_jupyter_extension.executable.PIXI_COMMON_LOCATIONS",
-                ["/nonexistent/pixi", temp_pixi_path],
+                ["/nonexistent/pixi", str(nonexecutable), temp_pixi_path],
             ),
         ):
             assert find_pixi(self._config()) == temp_pixi_path

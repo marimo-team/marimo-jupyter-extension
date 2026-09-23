@@ -98,8 +98,8 @@ c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
 # Or use uvx mode (sandbox)
 c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"
 
-# Sandbox backend: "uv" (default), "pixi" (conda per notebook; needs pixi>=0.80
-# and a marimo build with the pixi backend), or None to disable sandboxing
+# Sandbox backend: "uv" (default), "pixi", or None to disable sandboxing.
+# Pixi requires marimo>=0.25.0 and pixi>=0.80.
 c.MarimoProxyConfig.sandbox = "pixi"
 c.MarimoProxyConfig.pixi_path = "/opt/pixi/bin/pixi"  # if pixi is not on PATH
 

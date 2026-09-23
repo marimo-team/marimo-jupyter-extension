@@ -90,11 +90,12 @@ c.MarimoProxyConfig.pixi_path = "/opt/pixi/bin/pixi"
 
 ### pixi backend: marimo exits with "No such option" or "Invalid value for '--sandbox'"
 
-**Cause**: The installed marimo predates the pixi backend. Releases up to
-0.23.x accept only a bare `--sandbox` (uv).
+**Cause**: The installed marimo is older than 0.25.0 and rejects
+`--sandbox=pixi`.
 
-**Solution**: Install a marimo build that includes the pixi backend (marimo
-`main` at the time of writing), or set `c.MarimoProxyConfig.sandbox = "uv"`.
+**Solution**: Upgrade the configured marimo environment with
+`uv pip install --upgrade "marimo[sandbox]>=0.25.0"`, or set
+`c.MarimoProxyConfig.sandbox = "uv"`.
 
 ### pixi backend: "--sandbox=pixi requires a pixi with `pixi install --script` support"
 

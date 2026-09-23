@@ -100,11 +100,10 @@ class MarimoProxyConfig(Configurable):
         default_value="uv",
         allow_none=True,
         help=(
-            "Sandbox backend marimo uses to provision per-notebook "
-            "environments from PEP 723 metadata: 'uv' (the default) or "
-            "'pixi' (conda script environments; requires pixi>=0.80 and a "
-            "marimo release with the pixi backend). None starts marimo "
-            "without sandboxing."
+            "Sandbox backend for per-notebook environments from PEP 723 "
+            "metadata. 'uv' is the default. 'pixi' creates conda script "
+            "environments and requires pixi>=0.80 and marimo>=0.25.0. "
+            "None disables sandboxing."
         ),
     ).tag(config=True)
 
