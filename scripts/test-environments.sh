@@ -32,7 +32,8 @@ BOLD='\033[1m'
 TEST_ENV_DIR=".test-envs"
 STATE_FILE="$TEST_ENV_DIR/.state"
 KEEP_ENVIRONMENTS=false
-NO_SANDBOX=false
+SANDBOX="uv"
+JUPYTER_ARGS=()
 CONDA_ENVS_DIR="$TEST_ENV_DIR/conda-envs"
 CONDA_PKGS_DIR="$TEST_ENV_DIR/conda-pkgs"
 
@@ -81,14 +82,18 @@ ${BOLD}Options:${NC}
   --no-marimo     Don't install marimo in the preceding environment
   --with PKG      Install PKG in the preceding environment (can be repeated)
   --sink          Kitchen sink: 7 envs (venv/virtualenv/conda x marimo/no-marimo + venv-numpy)
-  --no-sandbox    Launch with no_sandbox=True (disables --sandbox and venv picker)
+  --sandbox MODE  Select uv (default), pixi, or none
+  --no-sandbox    Alias for --sandbox none (disables the venv picker)
   --keep          Don't clean up environments when JupyterLab exits
   --help          Show this help message
+  -- ARGS         Pass remaining arguments to JupyterLab
 
 ${BOLD}Examples:${NC}
   $0                                    # Create 1 conda environment (default)
   $0 --venv 2 --conda                   # Create 2 venv and 1 conda (all with marimo)
   $0 --venv --no-marimo                 # Create 1 venv without marimo
+  $0 --sink --sandbox pixi              # Test Pixi and environment selection
+  $0 --sandbox pixi                     # Test Pixi without creating extra kernels
   $0 --venv 2 --venv --no-marimo --conda --conda --no-marimo
                                         # Create 5 envs: 2 venv (marimo), 1 venv (no marimo),
                                         #                1 conda (marimo), 1 conda (no marimo)
@@ -121,6 +126,10 @@ ${BOLD}Testing:${NC}
   4. Select from the dropdown (includes "Default (no venv)" + test environments)
   5. Verify marimo starts with the selected environment
   6. Press Ctrl+C to exit and cleanup
+
+With --sandbox pixi, install pixi>=0.80 first.
+The script installs marimo>=0.25.0 and opens a directory containing pixi_demo.py.
+Open that notebook with marimo and use "Default (no venv)" to test its conda dependencies.
 
 EOF
 }
@@ -252,8 +261,18 @@ parse_args() {
         set -- --venv --venv --no-marimo --venv --with numpy --virtualenv --virtualenv --no-marimo --conda --conda --no-marimo "$@"
         ;;
       --no-sandbox)
-        NO_SANDBOX=true
+        SANDBOX="none"
         shift
+        ;;
+      --sandbox)
+        case "${2:-}" in
+          uv|pixi|none) SANDBOX="$2" ;;
+          *)
+            print_error "--sandbox requires uv, pixi, or none"
+            exit 1
+            ;;
+        esac
+        shift 2
         ;;
       --keep)
         KEEP_ENVIRONMENTS=true
@@ -262,6 +281,11 @@ parse_args() {
       --help)
         show_help
         exit 0
+        ;;
+      --)
+        shift
+        JUPYTER_ARGS=("$@")
+        break
         ;;
       *)
         print_error "Unknown option: $1"
@@ -385,9 +409,6 @@ cleanup_from_state() {
 
   print_success "Previous environments cleaned up"
 }
-
-# Set up trap for cleanup on exit, interrupt, or error
-trap cleanup EXIT INT TERM
 
 # Create venv environment using uv
 create_venv() {
@@ -582,8 +603,25 @@ create_conda_env() {
 main() {
   parse_args "$@"
 
+  if [[ "$SANDBOX" == "pixi" ]]; then
+    uv run python - << 'PYEOF' || return 1
+import subprocess
+
+from marimo_jupyter_extension.config import get_config
+from marimo_jupyter_extension.executable import get_pixi_path
+
+pixi = get_pixi_path(get_config())
+result = subprocess.run(
+    [pixi, "install", "--help"], capture_output=True, text=True, timeout=10
+)
+if result.returncode or "--script" not in result.stdout:
+    raise SystemExit("Install pixi>=0.80 to use --sandbox pixi.")
+PYEOF
+  fi
+
   # Clean up any previously kept environments first
   cleanup_from_state
+  trap cleanup EXIT INT TERM
 
   local total_envs=$((${#VENV_SPECS[@]} + ${#VIRTUALENV_SPECS[@]} + ${#CONDA_SPECS[@]}))
 
@@ -663,22 +701,46 @@ main() {
   echo ""
 
   # Re-build
-  uv pip install -e .
+  uv pip install -e . || return 1
 
-  # Generate config if --no-sandbox
-  local jupyter_args=()
-  if [[ "$NO_SANDBOX" == true ]]; then
-    local config_file="$TEST_ENV_DIR/jupyter_config.py"
-    mkdir -p "$TEST_ENV_DIR"
+  local jupyter_args=("${JUPYTER_ARGS[@]}")
+  local uv_args=()
+  local config_file="$PWD/$TEST_ENV_DIR/jupyter_config.py"
+  mkdir -p "$TEST_ENV_DIR"
+  if [[ "$SANDBOX" == "pixi" ]]; then
+    uv venv "$TEST_ENV_DIR/marimo" || return 1
+    uv pip install --python "$TEST_ENV_DIR/marimo/bin/python" \
+      "marimo[sandbox]>=0.25.0" || return 1
+    mkdir -p "$TEST_ENV_DIR/notebooks"
+    cp "$(dirname "${BASH_SOURCE[0]}")/../example/pixi_demo.py" \
+      "$TEST_ENV_DIR/notebooks/pixi_demo.py" || return 1
     cat > "$config_file" << 'PYEOF'
-c.MarimoProxyConfig.no_sandbox = True
+from pathlib import Path
+
+test_dir = Path(__file__).resolve().parent
+c.MarimoProxyConfig.sandbox = "pixi"
+c.MarimoProxyConfig.no_sandbox = False
+c.MarimoProxyConfig.uvx_path = None
+c.MarimoProxyConfig.marimo_path = str(test_dir / "marimo/bin/marimo")
+c.ServerApp.root_dir = str(test_dir / "notebooks")
 PYEOF
-    jupyter_args+=(--config "$config_file")
-    print_warning "Launching with no_sandbox=True (venv picker disabled)"
+    uv_args=(--directory "$PWD/$TEST_ENV_DIR/notebooks" --project "$PWD")
+    print_success "Open pixi_demo.py with marimo to test conda dependencies"
+  elif [[ "$SANDBOX" == "none" ]]; then
+    cat > "$config_file" << 'PYEOF'
+c.MarimoProxyConfig.sandbox = None
+PYEOF
+    print_warning "Launching without sandboxing (venv picker disabled)"
+  else
+    cat > "$config_file" << 'PYEOF'
+c.MarimoProxyConfig.sandbox = "uv"
+c.MarimoProxyConfig.no_sandbox = False
+PYEOF
   fi
+  jupyter_args+=(--config "$config_file")
 
   # Launch JupyterLab using uv
-  uv run jupyter lab "${jupyter_args[@]}"
+  uv run "${uv_args[@]}" jupyter lab "${jupyter_args[@]}"
 }
 
 main "$@"
