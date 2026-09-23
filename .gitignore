@@ -185,6 +185,7 @@ tsconfig.tsbuildinfo
 marimo_jupyter_extension/labextension/
 
 .claude/
+.test-envs/
 *.ipynb
 Untitled*
 lite/
