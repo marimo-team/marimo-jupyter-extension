@@ -14,6 +14,7 @@ def clean_env():
     env_vars = [
         "JUPYTERHUB_SERVICE_PREFIX",
         "UV",  # Used as fallback for uvx_path
+        "PIXI_HOME",  # Used by find_pixi
     ]
     old_values = {}
     for var in env_vars:
@@ -58,3 +59,26 @@ def mock_marimo_not_in_path():
             ["/nonexistent/path/marimo"],
         ):
             yield
+
+
+@pytest.fixture
+def mock_pixi_not_found():
+    """Hide any real pixi install: not on PATH, not in common locations."""
+    with patch(
+        "marimo_jupyter_extension.executable.shutil.which", return_value=None
+    ):
+        with patch(
+            "marimo_jupyter_extension.executable.PIXI_COMMON_LOCATIONS",
+            ["/nonexistent/path/pixi"],
+        ):
+            yield
+
+
+@pytest.fixture
+def temp_pixi_path(tmp_path):
+    """A mock pixi executable outside PATH; yields its path as a string."""
+    pixi_path = tmp_path / "pixi-bin" / "pixi"
+    pixi_path.parent.mkdir()
+    pixi_path.write_text("#!/bin/bash\necho 'mock pixi'")
+    pixi_path.chmod(0o755)
+    yield str(pixi_path)

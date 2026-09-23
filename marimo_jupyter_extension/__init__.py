@@ -7,9 +7,10 @@ marimo.
 import base64
 import os
 import secrets
+import shutil
 
-from .config import get_config
-from .executable import get_marimo_command
+from .config import Config, SandboxBackend, get_config
+from .executable import get_marimo_command, get_pixi_path
 
 __version__ = "0.4.0"
 __all__ = ["setup_marimoserver"]
@@ -32,7 +33,7 @@ def setup_marimoserver():
             *marimo_cmd,
             *(["--log-level", "DEBUG"] if config.debug else []),
             "edit",
-            *([] if config.no_sandbox else ["--sandbox"]),
+            *_sandbox_args(config.sandbox),
             "--port",
             "{port}",
             *(["--host", config.host] if config.host is not None else []),
@@ -61,7 +62,7 @@ def setup_marimoserver():
                 else []
             ),
         ],
-        "environment": {"MARIMO_SERVER_TRANSPORT": config.transport},
+        "environment": _environment(config),
         "timeout": config.timeout,
         "absolute_url": True,
         "request_headers_override": {
@@ -76,3 +77,37 @@ def setup_marimoserver():
             "enabled": False,
         },
     }
+
+
+def _sandbox_args(sandbox: SandboxBackend | None) -> list[str]:
+    """CLI arguments selecting marimo's sandbox backend.
+
+    The uv backend is spelled as a bare `--sandbox`, which marimo releases
+    without a backend choice (<= 0.23.x) accept and newer releases normalize
+    to `--sandbox=uv`. pixi uses the `=` form: `--sandbox pixi` would be
+    ambiguous with the positional notebook NAME argument.
+    """
+    if sandbox is None:
+        return []
+    if sandbox == "uv":
+        return ["--sandbox"]
+    return [f"--sandbox={sandbox}"]
+
+
+def _environment(config: Config) -> dict[str, str]:
+    """Extra environment for the spawned marimo process.
+
+    jupyter-server-proxy merges this into a copy of the server's environment.
+    """
+    environment = {"MARIMO_SERVER_TRANSPORT": config.transport}
+    if config.sandbox != "pixi":
+        return environment
+
+    # marimo locates pixi with shutil.which("pixi"), so a binary found via
+    # pixi_path or a common install location must be made visible on PATH.
+    pixi = get_pixi_path(config)
+    if shutil.which("pixi") != pixi:
+        environment["PATH"] = os.pathsep.join(
+            p for p in (os.path.dirname(pixi), os.environ.get("PATH", "")) if p
+        )
+    return environment

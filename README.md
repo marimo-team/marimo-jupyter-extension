@@ -25,7 +25,7 @@
 - 📁 **Context Menus** - Right-click `.py` files to edit with marimo, `.ipynb` files to convert
 - 🏢 **JupyterHub Compatible** - Works with existing authenticators and spawners
 - 🔒 **Secure** - Token-based authentication between proxy and marimo
-- 📦 **Sandbox Mode** - Run marimo in isolated environments with uvx
+- 📦 **Sandbox Mode** - Isolated per-notebook environments with uv, or conda environments with pixi
 
 ## Quick Start
 
@@ -98,7 +98,12 @@ c.MarimoProxyConfig.marimo_path = "/opt/bin/marimo"
 # Or use uvx mode (sandbox)
 c.MarimoProxyConfig.uvx_path = "/usr/local/bin/uvx"
 
-# Startup timeout (default: 60s)
+# Sandbox backend: "uv" (default), "pixi", or None to disable sandboxing.
+# Pixi requires marimo>=0.25.0 and pixi>=0.80.
+c.MarimoProxyConfig.sandbox = "pixi"
+c.MarimoProxyConfig.pixi_path = "/opt/pixi/bin/pixi"  # if pixi is not on PATH
+
+# Startup timeout (default: 60s, or 300s when sandbox = "pixi")
 c.MarimoProxyConfig.timeout = 120
 
 # Enable marimo debug logging for spawn troubleshooting
@@ -154,6 +159,7 @@ See [Troubleshooting Guide](https://marimo-team.github.io/marimo-jupyter-extensi
 | marimo fails to launch | Ensure marimo is in PATH or configure `MarimoProxyConfig.marimo_path` |
 | Modules not found | Install marimo in the same environment as your packages |
 | Sandbox features not working | Upgrade to `marimo[sandbox]>=0.23.14` |
+| `pixi executable not found` | Install `pixi>=0.80` and add it to PATH or set `MarimoProxyConfig.pixi_path` |
 
 ## Community
 

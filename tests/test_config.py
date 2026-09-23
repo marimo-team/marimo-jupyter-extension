@@ -114,6 +114,43 @@ class TestMarimoProxyConfig:
 
         assert config.no_sandbox is False
 
+    def test_default_sandbox_is_uv(self, clean_env):
+        """Default sandbox backend should be 'uv'."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        assert config.sandbox == "uv"
+
+    @pytest.mark.parametrize("value", ["uv", "pixi", None])
+    def test_sandbox_accepts_backends_and_none(self, clean_env, value):
+        """sandbox should accept 'uv', 'pixi', and None."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+        config.sandbox = value
+
+        assert config.sandbox == value
+
+    def test_sandbox_rejects_unknown_backend(self, clean_env):
+        """sandbox should reject values other than uv/pixi/None."""
+        from traitlets import TraitError
+
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        with pytest.raises(TraitError):
+            config.sandbox = "conda"
+
+    def test_default_pixi_path_is_none(self, clean_env):
+        """Default pixi_path should be None."""
+        from marimo_jupyter_extension.config import MarimoProxyConfig
+
+        config = MarimoProxyConfig()
+
+        assert config.pixi_path is None
+
     def test_default_transport_is_websocket(self, clean_env):
         """Default transport should be 'websocket'."""
         from marimo_jupyter_extension.config import MarimoProxyConfig
@@ -183,6 +220,8 @@ class TestGetConfig:
         assert hasattr(result, "base_url")
         assert hasattr(result, "debug")
         assert hasattr(result, "no_sandbox")
+        assert hasattr(result, "sandbox")
+        assert hasattr(result, "pixi_path")
 
     def test_base_url_with_prefix(self, clean_env, mock_marimo_in_path):
         """base_url should use JUPYTERHUB_SERVICE_PREFIX."""
@@ -265,6 +304,180 @@ class TestGetConfig:
         result = get_config(traitlets_config)
 
         assert result.no_sandbox is True
+
+    def test_sandbox_defaults_to_uv(self, clean_env, mock_marimo_in_path):
+        """sandbox should default to 'uv' in get_config result."""
+        from marimo_jupyter_extension.config import get_config
+
+        result = get_config()
+
+        assert result.sandbox == "uv"
+        assert result.no_sandbox is False
+
+    def test_sandbox_pixi_applied_from_traitlets(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """sandbox='pixi' should be applied from traitlets config."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.sandbox = "pixi"
+
+        result = get_config(traitlets_config)
+
+        assert result.sandbox == "pixi"
+        assert result.no_sandbox is False
+
+    def test_sandbox_none_disables_sandbox(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """sandbox=None should behave like the legacy no_sandbox=True."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.sandbox = None
+
+        result = get_config(traitlets_config)
+
+        assert result.sandbox is None
+        assert result.no_sandbox is True
+
+    def test_no_sandbox_alias_forces_sandbox_none_silently(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """no_sandbox=True alone should yield sandbox=None without warning."""
+        import warnings
+
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.no_sandbox = True
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = get_config(traitlets_config)
+
+        assert result.sandbox is None
+        assert result.no_sandbox is True
+
+    def test_no_sandbox_conflict_with_sandbox_warns(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """no_sandbox=True with an explicit backend should warn and win."""
+        from traitlets.config import Config as TraitletsConfig
+
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        # Mirror jupyterhub_config.py: values arrive through a Config object.
+        c = TraitletsConfig()
+        c.MarimoProxyConfig.no_sandbox = True
+        c.MarimoProxyConfig.sandbox = "pixi"
+
+        with pytest.warns(UserWarning, match="no_sandbox=True overrides"):
+            result = get_config(MarimoProxyConfig(config=c))
+
+        assert result.sandbox is None
+
+    def test_no_sandbox_with_explicit_sandbox_none_does_not_warn(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """no_sandbox=True and sandbox=None agree; no warning."""
+        import warnings
+
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.no_sandbox = True
+        traitlets_config.sandbox = None
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = get_config(traitlets_config)
+
+        assert result.sandbox is None
+
+    def test_pixi_path_applied_from_traitlets(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """pixi_path should be applied from traitlets config."""
+        from marimo_jupyter_extension.config import (
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.pixi_path = "/opt/pixi/bin/pixi"
+
+        result = get_config(traitlets_config)
+
+        assert result.pixi_path == "/opt/pixi/bin/pixi"
+
+    def test_timeout_default_widened_for_pixi(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """An unset timeout should become DEFAULT_PIXI_TIMEOUT under pixi."""
+        from marimo_jupyter_extension.config import (
+            DEFAULT_PIXI_TIMEOUT,
+            DEFAULT_TIMEOUT,
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        traitlets_config = MarimoProxyConfig()
+        traitlets_config.sandbox = "pixi"
+
+        result = get_config(traitlets_config)
+
+        assert DEFAULT_PIXI_TIMEOUT > DEFAULT_TIMEOUT
+        assert result.timeout == DEFAULT_PIXI_TIMEOUT
+
+    def test_timeout_default_unchanged_for_uv(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """The uv backend keeps the historical default timeout."""
+        from marimo_jupyter_extension.config import (
+            DEFAULT_TIMEOUT,
+            get_config,
+        )
+
+        result = get_config()
+
+        assert result.timeout == DEFAULT_TIMEOUT
+
+    def test_explicit_timeout_wins_over_pixi_default(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """An explicit timeout is respected even when it equals the uv default."""
+        from traitlets.config import Config as TraitletsConfig
+
+        from marimo_jupyter_extension.config import (
+            DEFAULT_TIMEOUT,
+            MarimoProxyConfig,
+            get_config,
+        )
+
+        c = TraitletsConfig()
+        c.MarimoProxyConfig.sandbox = "pixi"
+        c.MarimoProxyConfig.timeout = DEFAULT_TIMEOUT
+
+        result = get_config(MarimoProxyConfig(config=c))
+
+        assert result.timeout == DEFAULT_TIMEOUT
 
     def test_transport_default_is_websocket(
         self, clean_env, mock_marimo_in_path
@@ -349,3 +562,18 @@ class TestConfigDataclass:
 
         with pytest.raises(Exception):  # FrozenInstanceError
             config.timeout = 120
+
+    def test_no_sandbox_derives_from_sandbox(self, clean_env):
+        """no_sandbox should be True exactly when sandbox is None."""
+        from marimo_jupyter_extension.config import Config
+
+        base = dict(
+            marimo_path="/path/to/marimo",
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+        )
+
+        assert Config(**base).no_sandbox is False
+        assert Config(**base, sandbox="pixi").no_sandbox is False
+        assert Config(**base, sandbox=None).no_sandbox is True

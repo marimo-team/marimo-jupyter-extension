@@ -292,7 +292,16 @@ async function getNotebookEnvironment(
   };
 }
 
-async function isSandboxDisabled(): Promise<boolean> {
+/** Sandbox backend reported by GET /marimo-tools/config; null = disabled. */
+type SandboxBackend = 'uv' | 'pixi' | null;
+
+interface ProxyConfig {
+  no_sandbox: boolean;
+  /** Absent on servers predating the pixi backend; fall back to no_sandbox. */
+  sandbox?: SandboxBackend;
+}
+
+async function getSandboxBackend(): Promise<SandboxBackend> {
   const settings = ServerConnection.makeSettings();
   try {
     const response = await ServerConnection.makeRequest(
@@ -301,13 +310,25 @@ async function isSandboxDisabled(): Promise<boolean> {
       settings,
     );
     if (response.ok) {
-      const config = (await response.json()) as { no_sandbox: boolean };
-      return config.no_sandbox;
+      const config = (await response.json()) as ProxyConfig;
+      if (config.sandbox !== undefined) {
+        return config.sandbox;
+      }
+      return config.no_sandbox ? null : 'uv';
     }
   } catch {
     // Sandbox mode is the default when configuration cannot be read.
   }
-  return false;
+  return 'uv';
+}
+
+/**
+ * True when marimo runs with no sandbox backend. Both uv and pixi keep the
+ * venv picker: a `tool.marimo.venv.path` set by the picker takes precedence
+ * over either backend's per-notebook environment.
+ */
+async function isSandboxDisabled(): Promise<boolean> {
+  return (await getSandboxBackend()) === null;
 }
 
 /**
