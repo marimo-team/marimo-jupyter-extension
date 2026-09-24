@@ -276,6 +276,108 @@ class TestPixiSandbox:
         assert "https://pixi.sh" in message
         assert "MarimoProxyConfig.pixi_path" in message
 
+    @pytest.mark.parametrize(
+        ("source", "version"),
+        [
+            ("explicit", "0.24.2"),
+            ("path", "0.24.2"),
+            ("common", "0.24.2"),
+            ("explicit", "0.25.0rc1"),
+        ],
+    )
+    def test_rejects_old_marimo(
+        self,
+        clean_env,
+        temp_bin_dir,
+        temp_pixi_path,
+        monkeypatch,
+        source,
+        version,
+    ):
+        marimo = Path(temp_bin_dir) / "marimo"
+        marimo.write_text(f"#!/bin/sh\necho 'marimo {version}'\n")
+        config = self._pixi_config(
+            str(marimo) if source == "explicit" else None,
+            pixi_path=temp_pixi_path,
+        )
+        monkeypatch.setenv(
+            "PATH", temp_bin_dir if source == "path" else "/nonexistent"
+        )
+        monkeypatch.setattr(
+            "marimo_jupyter_extension.executable.COMMON_LOCATIONS",
+            [str(marimo)] if source == "common" else [],
+        )
+
+        with pytest.raises(RuntimeError) as exc_info:
+            self._setup(config)
+
+        message = str(exc_info.value)
+        assert str(marimo) in message
+        assert f"Detected {version}" in message
+        assert "Pixi sandboxing requires marimo>=0.25.0" in message
+        assert 'uv pip install --upgrade "marimo[sandbox]>=0.25.0"' in message
+        assert "MarimoProxyConfig.uvx_path" in message
+
+    @pytest.mark.parametrize("version", ["0.25.0", "0.25.0+local", "0.100.0"])
+    def test_accepts_supported_marimo(
+        self, clean_env, temp_bin_dir, temp_pixi_path, version
+    ):
+        marimo = Path(temp_bin_dir) / "marimo"
+        marimo.write_text(f"#!/bin/sh\necho 'marimo {version}'\n")
+        config = self._pixi_config(str(marimo), pixi_path=temp_pixi_path)
+
+        result = self._setup(config)
+
+        assert result["command"][0] == str(marimo)
+        assert "--sandbox=pixi" in result["command"]
+
+    @pytest.mark.parametrize("sandbox", ["uv", None])
+    def test_other_backends_do_not_probe_marimo_version(
+        self, clean_env, sandbox
+    ):
+        from marimo_jupyter_extension.config import Config
+
+        config = Config(
+            marimo_path="/opt/bin/marimo",
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            sandbox=sandbox,
+        )
+        with patch(
+            "marimo_jupyter_extension.version_info.subprocess.run"
+        ) as run:
+            result = self._setup(config)
+
+        run.assert_not_called()
+        assert result["command"][0] == "/opt/bin/marimo"
+        assert ("--sandbox" in result["command"]) == (sandbox == "uv")
+
+    def test_uvx_enforces_minimum_without_probing_marimo(
+        self, clean_env, temp_pixi_path
+    ):
+        from marimo_jupyter_extension.config import Config
+
+        config = Config(
+            marimo_path="/opt/bin/marimo",
+            uvx_path="/opt/bin/uvx",
+            timeout=300,
+            base_url="/marimo",
+            sandbox="pixi",
+            pixi_path=temp_pixi_path,
+        )
+        with patch(
+            "marimo_jupyter_extension.version_info.subprocess.run"
+        ) as run:
+            result = self._setup(config)
+
+        run.assert_not_called()
+        assert result["command"][:2] == [
+            "/opt/bin/uvx",
+            "marimo[sandbox]>=0.25.0",
+        ]
+        assert "--sandbox=pixi" in result["command"]
+
     def test_uv_backend_never_probes_pixi(self, clean_env, temp_bin_dir):
         """The default backend must not require pixi to be installed."""
         from marimo_jupyter_extension.config import Config

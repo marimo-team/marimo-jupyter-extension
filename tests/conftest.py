@@ -35,7 +35,7 @@ def temp_bin_dir():
     """Create a temporary directory with a mock marimo executable."""
     with tempfile.TemporaryDirectory() as tmpdir:
         marimo_path = Path(tmpdir) / "marimo"
-        marimo_path.write_text("#!/bin/bash\necho 'mock marimo'")
+        marimo_path.write_text("#!/bin/bash\necho 'marimo 0.25.0'")
         marimo_path.chmod(0o755)
         yield tmpdir
 
