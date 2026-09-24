@@ -11,6 +11,7 @@ import shutil
 
 from .config import Config, SandboxBackend, get_config
 from .executable import get_marimo_command, get_pixi_path
+from .version_info import check_pixi_marimo_version
 
 __version__ = "0.4.0"
 __all__ = ["setup_marimoserver"]
@@ -27,6 +28,8 @@ def setup_marimoserver():
 
     # Get marimo command based on config
     marimo_cmd = get_marimo_command(config)
+    if config.sandbox == "pixi" and not config.uvx_path:
+        check_pixi_marimo_version(marimo_cmd)
 
     return {
         "command": [
