@@ -6,7 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from marimo_jupyter_extension import setup_marimoserver, version_info
+from marimo_jupyter_extension import (
+    executable,
+    setup_marimoserver,
+    version_info,
+)
 from marimo_jupyter_extension.config import Config
 
 
@@ -55,18 +59,13 @@ def test_setup_and_display_share_version_probe(config, version_first):
     )
 
 
-@pytest.mark.parametrize("uvx", [False, True])
-def test_version_cache_distinguishes_commands(config, uvx):
-    if uvx:
-        config = replace(config, uvx_path="/opt/bin/uvx", sandbox="uv")
-        other = replace(config, sandbox="pixi")
-    else:
-        other = replace(config, marimo_path="/other/marimo")
+def _assert_reprobed(first, second):
+    """Two configs that spawn different commands each get their own probe."""
     with (
         patch.object(
             version_info,
             "get_config",
-            side_effect=[config, other],
+            side_effect=[first, second],
         ),
         patch.object(
             version_info.subprocess,
@@ -79,6 +78,20 @@ def test_version_cache_distinguishes_commands(config, uvx):
     ):
         assert version_info.get_marimo_version() == "0.24.2"
         assert version_info.get_marimo_version() == "0.25.0"
+
+
+def test_version_cache_distinguishes_marimo_paths(config):
+    _assert_reprobed(config, replace(config, marimo_path="/other/marimo"))
+
+
+def test_version_cache_distinguishes_sandbox_backends(config):
+    # uvx requests `marimo[sandbox]>=<floor>`, and the floor depends on the
+    # backend. Pin the uv floor below pixi's so the two commands differ even
+    # when the constants are currently equal.
+    uv = replace(config, uvx_path="/opt/bin/uvx", sandbox="uv")
+    pixi = replace(uv, sandbox="pixi")
+    with patch.object(executable, "MARIMO_VERSION", "0.23.14"):
+        _assert_reprobed(uv, pixi)
 
 
 @pytest.mark.parametrize("output", ["", "invalid"])

@@ -5,13 +5,22 @@ from unittest.mock import patch
 
 import pytest
 
+from marimo_jupyter_extension.executable import (
+    MARIMO_VERSION,
+    PIXI_MARIMO_MIN_VERSION,
+)
+
 
 class TestGetMarimoCommand:
     """Test suite for get_marimo_command() function."""
 
     @pytest.mark.parametrize(
         ("sandbox", "minimum"),
-        [("uv", "0.23.14"), ("pixi", "0.25.0"), (None, "0.23.14")],
+        [
+            ("uv", MARIMO_VERSION),
+            ("pixi", PIXI_MARIMO_MIN_VERSION),
+            (None, MARIMO_VERSION),
+        ],
     )
     def test_uvx_mode_with_uvx_path(self, clean_env, sandbox, minimum):
         """Select a marimo version that supports the sandbox backend."""
