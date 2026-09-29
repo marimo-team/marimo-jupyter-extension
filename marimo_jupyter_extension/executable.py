@@ -7,7 +7,7 @@ from pathlib import Path
 from .config import Config
 
 # Minimum marimo version for uv or disabled sandboxing.
-MARIMO_VERSION = "0.23.14"
+MARIMO_VERSION = "0.25.0"
 PIXI_MARIMO_MIN_VERSION = "0.25.0"
 
 COMMON_LOCATIONS = [
