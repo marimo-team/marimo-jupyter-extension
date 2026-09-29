@@ -150,7 +150,7 @@ guide for the notebook side.
 > **Warning:** Upgrade to `marimo>=0.25.0` before selecting `sandbox = "pixi"`.
 > Older releases reject `--sandbox=pixi`.
 
-- `marimo>=0.25.0` for Pixi, or `marimo>=0.23.14` for uv.
+- `marimo>=0.25.0`.
 - `pixi>=0.80`, which adds `pixi install --script`. marimo probes for it at
   startup and fails otherwise.
 - Network access to conda-forge (or a mirror configured in pixi's global

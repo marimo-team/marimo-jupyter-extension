@@ -72,7 +72,7 @@ dependencies = [
     "notebook>=7.5.0",
     "oauthenticator>=17.3.0",
     "jupyterhub-systemdspawner>=1.0.2",
-    "marimo>=0.23.14",
+    "marimo>=0.25.0",
     "marimo-jupyter-extension>=0.1.0",
 ]
 ```
@@ -132,7 +132,7 @@ example:
 ```python
 # Use SSE instead of WebSockets for the marimo kernel connection. Needed behind
 # proxies that don't forward WebSockets, e.g. AWS SageMaker (requires
-# marimo>=0.23.14). Defaults to "websocket".
+# marimo>=0.25.0). Defaults to "websocket".
 c.MarimoProxyConfig.transport = "sse"
 ```
 
