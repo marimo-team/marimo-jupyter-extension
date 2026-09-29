@@ -13,7 +13,7 @@ from .config import Config, SandboxBackend, get_config
 from .executable import get_marimo_command, get_pixi_path
 from .version_info import check_pixi_marimo_version
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = ["setup_marimoserver"]
 
 
