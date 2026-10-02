@@ -5,7 +5,7 @@ import socket
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from jupyter_server.utils import url_path_join
 from traitlets import (
@@ -20,6 +20,9 @@ from traitlets import (
     validate,
 )
 from traitlets.config import Configurable
+
+if TYPE_CHECKING:
+    from jupyter_server.serverapp import ServerApp
 
 DEFAULT_TIMEOUT = 60
 # pixi cold starts (`pixi exec` fetching uv, conda solve, uv overlay build)
@@ -282,18 +285,34 @@ class Config:
         return self.sandbox is None
 
 
+def _running_server() -> "ServerApp | None":
+    """The Jupyter server this process runs in, or None outside one."""
+    try:
+        from jupyter_server.serverapp import ServerApp
+
+        # NB. instance() creates a default app when none exists, which
+        # would hide the absence of a server. Only use a live one.
+        if ServerApp.initialized():
+            return ServerApp.instance()
+    except Exception:
+        pass
+    return None
+
+
 def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
     """Load configuration from Traitlets or defaults."""
+    app = _running_server()
     if traitlets_config is not None:
         cfg = traitlets_config
     else:
-        # Try to get config from the running ServerApp so that settings
-        # from jupyter_notebook_config / jupyterhub_config are respected.
+        # Settings from jupyter_server_config / jupyterhub_config live on
+        # the running server.
         try:
-            from jupyter_server.serverapp import ServerApp
-
-            app = ServerApp.instance()
-            cfg = MarimoProxyConfig(config=app.config)
+            cfg = (
+                MarimoProxyConfig(config=app.config)
+                if app is not None
+                else MarimoProxyConfig()
+            )
         except Exception:
             cfg = MarimoProxyConfig()
 
@@ -302,7 +321,7 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
         marimo_path=cfg.marimo_path,
         uvx_path=cfg.uvx_path,
         timeout=cfg.resolve_timeout(sandbox),
-        base_url=_get_base_url(),
+        base_url=_get_base_url(app),
         debug=bool(cfg.debug),
         sandbox=sandbox,
         pixi_path=cfg.pixi_path,
@@ -317,7 +336,14 @@ def get_config(traitlets_config: MarimoProxyConfig | None = None) -> Config:
     )
 
 
-def _get_base_url() -> str:
-    """Get base URL, gracefully handling non-JupyterHub environments."""
-    prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
+def _get_base_url(server_app: "ServerApp | None") -> str:
+    """The URL prefix that marimo serves under."""
+    # NB. The server's base_url controls the prefix because absolute_url
+    # makes jupyter-server-proxy forward <server base_url>/marimo/<path>
+    # unchanged. SageMaker Studio runs Jupyter under /jupyterlab/default/
+    # without JupyterHub, so JUPYTERHUB_SERVICE_PREFIX alone misses it.
+    if server_app is not None:
+        prefix = server_app.base_url
+    else:
+        prefix = os.environ.get("JUPYTERHUB_SERVICE_PREFIX", "/")
     return url_path_join(prefix, "marimo")
