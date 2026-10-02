@@ -2,6 +2,7 @@
 
 import os
 import socket
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -223,18 +224,49 @@ class TestGetConfig:
         assert hasattr(result, "sandbox")
         assert hasattr(result, "pixi_path")
 
-    def test_base_url_with_prefix(self, clean_env, mock_marimo_in_path):
-        """base_url should use JUPYTERHUB_SERVICE_PREFIX."""
+    def test_base_url_follows_server_base_url(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """base_url comes from the Jupyter server, with no Hub variable set."""
+        from traitlets.config import Config as TraitletsConfig
+
+        from marimo_jupyter_extension.config import get_config
+
+        server = SimpleNamespace(
+            base_url="/jupyterlab/default/", config=TraitletsConfig()
+        )
+        with (
+            patch(
+                "jupyter_server.serverapp.ServerApp.initialized",
+                return_value=True,
+            ),
+            patch(
+                "jupyter_server.serverapp.ServerApp.instance",
+                return_value=server,
+            ),
+        ):
+            result = get_config()
+
+        assert result.base_url == "/jupyterlab/default/marimo"
+
+    def test_base_url_falls_back_to_hub_prefix(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """Outside a Jupyter server, JUPYTERHUB_SERVICE_PREFIX sets base_url."""
         os.environ["JUPYTERHUB_SERVICE_PREFIX"] = "/user/testuser/"
 
         from marimo_jupyter_extension.config import get_config
 
-        result = get_config()
+        with patch(
+            "jupyter_server.serverapp.ServerApp.initialized",
+            return_value=False,
+        ):
+            result = get_config()
 
         assert result.base_url == "/user/testuser/marimo"
 
     def test_base_url_without_prefix(self, clean_env, mock_marimo_in_path):
-        """base_url should default to /marimo when no prefix."""
+        """base_url is /marimo on a bare server."""
         from marimo_jupyter_extension.config import get_config
 
         result = get_config()
