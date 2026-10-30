@@ -1,0 +1,5 @@
+nodeLinker: hoisted
+
+allowBuilds:
+  '@biomejs/biome': false
+  '@fortawesome/fontawesome-free': false
