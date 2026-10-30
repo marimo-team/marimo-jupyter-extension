@@ -8,7 +8,7 @@
     "url": "https://github.com/marimo-team/marimo-jupyter-extension/issues"
   },
   "license": "Apache-2.0",
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@12.16.1",
   "author": {
     "name": "Marimo Team"
   },
@@ -54,7 +54,10 @@
     "@jupyterlab/launcher": "^4.5.6",
     "@jupyterlab/services": "^7.5.6",
     "@jupyterlab/ui-components": "^4.5.6",
+    "@lumino/commands": "^2.3.3",
     "@lumino/coreutils": "^2.2.2",
+    "@lumino/messaging": "^2.0.4",
+    "@lumino/signaling": "^2.1.5",
     "@lumino/widgets": "^2.7.5"
   },
   "devDependencies": {
