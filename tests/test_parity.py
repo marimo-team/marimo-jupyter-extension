@@ -32,7 +32,7 @@ HARDCODED_OPTIONS: set[str] = {
     "--token",  # always enabled; token auth is required
     "--token-password",  # auto-generated via secrets.token_urlsafe(16)
     "--no-skew-protection",  # required for proxy compat (version mismatch ok)
-    "--base-url",  # auto-configured from JUPYTERHUB_SERVICE_PREFIX
+    "--base-url",  # derived from the Jupyter server's base_url
 }
 
 # Mapped to MarimoProxyConfig traitlets in config.py — user-configurable.
