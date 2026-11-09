@@ -493,26 +493,26 @@ class TestAbsoluteUrl:
 
         assert result.get("absolute_url") is True
 
-    def test_base_url_with_prefix(self, clean_env, mock_marimo_in_path):
-        """Base URL should use JUPYTERHUB_SERVICE_PREFIX when set."""
-        os.environ["JUPYTERHUB_SERVICE_PREFIX"] = "/user/testuser/"
-
+    def test_base_url_flag_is_config_base_url(
+        self, clean_env, mock_marimo_in_path
+    ):
+        """--base-url passes config.base_url unchanged."""
         from marimo_jupyter_extension import setup_marimoserver
+        from marimo_jupyter_extension.config import Config
 
-        result = setup_marimoserver()
-        command = " ".join(result["command"])
+        config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/jupyterlab/default/marimo",
+        )
+        with patch("marimo_jupyter_extension.get_config", return_value=config):
+            command = setup_marimoserver()["command"]
 
-        assert "/user/testuser/marimo" in command
-
-    def test_base_url_without_prefix(self, clean_env, mock_marimo_in_path):
-        """Base URL should default to /marimo when no prefix set."""
-        # clean_env already removes JUPYTERHUB_SERVICE_PREFIX
-        from marimo_jupyter_extension import setup_marimoserver
-
-        result = setup_marimoserver()
-        command = " ".join(result["command"])
-
-        assert "/marimo" in command
+        assert (
+            command[command.index("--base-url") + 1]
+            == "/jupyterlab/default/marimo"
+        )
 
 
 class TestHostFlag:
