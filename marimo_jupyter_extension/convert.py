@@ -1,5 +1,6 @@
 """Shared notebook conversion logic."""
 
+import os
 import subprocess
 
 from .config import get_config
@@ -22,7 +23,9 @@ def convert_notebook_to_marimo(input_path: str, output_path: str) -> None:
     result = subprocess.run(
         [*marimo_cmd, "convert", input_path, "-o", output_path],
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
     if result.returncode != 0:
