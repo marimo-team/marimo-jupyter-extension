@@ -104,10 +104,7 @@ def _environment(config: Config) -> dict[str, str]:
     """
     environment = {"MARIMO_SERVER_TRANSPORT": config.transport}
     if config.sandbox is not None:
-        # NB. marimo 0.25.1 stopped honoring a notebook's [tool.marimo.venv]
-        # under --sandbox. Later releases honor it again when this is set:
-        # the manifest picks each notebook's environment, which the venv
-        # picker relies on.
+        # NB. sandboxing does not work in marimo 0.25.1
         environment["MARIMO_SANDBOX_AUTO"] = "1"
     if config.sandbox != "pixi":
         return environment
