@@ -56,7 +56,7 @@ class MarimoExporter(Exporter):
             convert_notebook_to_marimo(tmp_in_path, tmp_out_path)
 
             # Read converted output
-            with open(tmp_out_path) as f:
+            with open(tmp_out_path, encoding="utf-8") as f:
                 output = f.read()
 
             # Set output extension for nbconvert handler
