@@ -103,6 +103,12 @@ def _environment(config: Config) -> dict[str, str]:
     jupyter-server-proxy merges this into a copy of the server's environment.
     """
     environment = {"MARIMO_SERVER_TRANSPORT": config.transport}
+    if config.sandbox is not None:
+        # NB. marimo 0.25.1 stopped honoring a notebook's [tool.marimo.venv]
+        # under --sandbox. Later releases honor it again when this is set:
+        # the manifest picks each notebook's environment, which the venv
+        # picker relies on.
+        environment["MARIMO_SANDBOX_AUTO"] = "1"
     if config.sandbox != "pixi":
         return environment
 
