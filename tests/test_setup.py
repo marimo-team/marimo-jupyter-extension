@@ -400,6 +400,34 @@ class TestPixiSandbox:
         assert "PATH" not in result["environment"]
 
 
+class TestSandboxAutoEnvironment:
+    """MARIMO_SANDBOX_AUTO lets the manifest pick each notebook's env."""
+
+    def _environment(self, mock_marimo_in_path, sandbox):
+        from marimo_jupyter_extension import setup_marimoserver
+        from marimo_jupyter_extension.config import Config
+
+        config = Config(
+            marimo_path=mock_marimo_in_path,
+            uvx_path=None,
+            timeout=60,
+            base_url="/marimo",
+            sandbox=sandbox,
+        )
+        with patch("marimo_jupyter_extension.get_config", return_value=config):
+            return setup_marimoserver()["environment"]
+
+    def test_set_for_uv_sandbox(self, clean_env, mock_marimo_in_path):
+        env = self._environment(mock_marimo_in_path, "uv")
+
+        assert env["MARIMO_SANDBOX_AUTO"] == "1"
+
+    def test_absent_without_sandbox(self, clean_env, mock_marimo_in_path):
+        env = self._environment(mock_marimo_in_path, None)
+
+        assert "MARIMO_SANDBOX_AUTO" not in env
+
+
 class TestTransportEnvironment:
     """Test suite for the MARIMO_SERVER_TRANSPORT environment variable."""
 

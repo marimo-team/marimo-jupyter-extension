@@ -103,6 +103,9 @@ def _environment(config: Config) -> dict[str, str]:
     jupyter-server-proxy merges this into a copy of the server's environment.
     """
     environment = {"MARIMO_SERVER_TRANSPORT": config.transport}
+    if config.sandbox is not None:
+        # NB. sandboxing does not work in marimo 0.25.1
+        environment["MARIMO_SANDBOX_AUTO"] = "1"
     if config.sandbox != "pixi":
         return environment
 
