@@ -8,7 +8,7 @@ on:
 jobs:
   test-typescript:
     name: TypeScript
-    runs-on: ubuntu-p-small
+    runs-on: "${{ vars.CI_RUNNER_SMALL || 'ubuntu-latest' }}"
     defaults:
       run:
         working-directory: labextension
@@ -34,7 +34,7 @@ jobs:
 
   test:
     name: Python
-    runs-on: ubuntu-p-small
+    runs-on: "${{ vars.CI_RUNNER_SMALL || 'ubuntu-latest' }}"
     strategy:
       fail-fast: false
       matrix:
