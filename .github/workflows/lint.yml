@@ -8,7 +8,7 @@ on:
 jobs:
   lint-typescript:
     name: TypeScript
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-p-small
     defaults:
       run:
         working-directory: labextension
@@ -40,7 +40,7 @@ jobs:
 
   lint-python:
     name: Python
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-p-small
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
