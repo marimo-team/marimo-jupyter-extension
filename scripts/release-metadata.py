@@ -7,14 +7,7 @@ import sys
 from pathlib import Path
 
 version = subprocess.check_output(
-    [
-        "uv",
-        "version",
-        "--package",
-        "marimo-jupyter-extension",
-        "--frozen",
-        "--short",
-    ],
+    ["uv", "version", "--short"],
     text=True,
 ).strip()
 path = Path("marimo_jupyter_extension/__init__.py")
