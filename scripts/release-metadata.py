@@ -2,14 +2,21 @@
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
-import tomllib
-
-version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))[
-    "project"
-]["version"]
+version = subprocess.check_output(
+    [
+        "uv",
+        "version",
+        "--package",
+        "marimo-jupyter-extension",
+        "--frozen",
+        "--short",
+    ],
+    text=True,
+).strip()
 path = Path("marimo_jupyter_extension/__init__.py")
 pattern = '^__version__ = "[^"\\n]+"$'
 text = path.read_text(encoding="utf-8")
