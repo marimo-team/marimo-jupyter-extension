@@ -1,0 +1,9 @@
+{
+  "repository": "marimo-team/marimo-jupyter-extension",
+  "files": ["pyproject.toml", "marimo_jupyter_extension/__init__.py"],
+  "command": ["./scripts/release.sh"],
+  "docs": "RELEASING.md",
+  "checks": [],
+  "metadata": ["python3", "scripts/release-metadata.py"],
+  "prepare": ["bash", "scripts/prepare-release.sh"]
+}
