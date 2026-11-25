@@ -52,6 +52,8 @@ EXPOSED_OPTIONS: set[str] = {
 
 # Deliberately not exposed — not applicable in a proxy deployment.
 EXCLUDED_OPTIONS: set[str] = {
+    "--config",  # marimo discovers its config; the proxy has no config-file override
+    "--container-engine",  # container isolation is not managed by this proxy
     "--proxy",  # upstream reverse proxy address, not this proxy
     "--no-token",  # token auth is always required by the proxy
     "--token-password-file",  # token is auto-generated; file mode not needed
